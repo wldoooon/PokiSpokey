@@ -20,7 +20,7 @@ class UserUsage(SQLModel, table=True):
     
     searches_count: int = Field(default=0)
     
-    ai_credit_balance: int = Field(default=50000)
+    ai_credit_balance: int = Field(default=60000)
     usage_reset_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False)
@@ -43,6 +43,6 @@ class UserUsage(SQLModel, table=True):
 
 class UserUsageRead(SQLModel):
     searches_count: int = 0
-    ai_credit_balance: int = 50000
+    ai_credit_balance: int = 60000
     total_searches: int = 0
     total_ai_chats: int = 0

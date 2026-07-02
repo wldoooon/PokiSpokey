@@ -37,9 +37,10 @@ class Invoice(SQLModel, table=True):
         index=True,
     )
 
-    subscription_id: uuid.UUID = Field(
+    subscription_id: uuid.UUID | None = Field(
+        default=None,
         foreign_key="subscription.id",
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
@@ -69,6 +70,9 @@ class Invoice(SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime(timezone=True))
     )
+
+    # PDF invoice URL from Dodo (available after payment.succeeded)
+    invoice_url: str | None = Field(default=None)
 
     # When the payment happened — used for sorting billing history in UI
     created_at: datetime = Field(

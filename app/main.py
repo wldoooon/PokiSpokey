@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import manticoresearch
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .core.redis import redis_client
+from .core.dodo import dodo_client
 from .services.usage_service import sync_all_dirty_users
 from .services.translation_service import TranslationService
 
@@ -72,6 +73,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start background scheduler: {e}")
     
+    # 4. Initialize Dodo Payments client
+    try:
+        await dodo_client.connect()
+        logger.success("Dodo Payments client initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize Dodo client: {e}")
+
     logger.info("Application startup complete")
     yield
     
@@ -91,6 +99,10 @@ async def lifespan(app: FastAPI):
     # Close Redis connection pool
     await redis_client.close()
     logger.info("Redis connection closed")
+
+    # Close Dodo Payments client
+    await dodo_client.close()
+    logger.info("Dodo Payments client closed")
 
     logger.info("Application shutdown complete")
 

@@ -82,6 +82,17 @@ function useSpamGuard(clickWindowMs = 2000, clickLimit = 5, cooldownSeconds = 5)
 }
 
 
+// ── Spam Guard Overlay ──────────────────────────────────────────────────────
+function SpamGuardOverlay({ cooldownLeft }: { cooldownLeft: number }) {
+  return (
+    <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-background/80">
+      <div className="bg-card border border-border/50 shadow-sm rounded-full px-3 py-1.5">
+        <span className="text-[11px] font-semibold text-foreground">Slow down!! {cooldownLeft}s</span>
+      </div>
+    </div>
+  )
+}
+
 // ── Speed Picker ────────────────────────────────────────────────────────────
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2]
 
@@ -114,6 +125,7 @@ function SpeedPicker({ currentRate, onSelect }: { currentRate: number; onSelect:
 const flag = (cc: string) => `https://flagcdn.com/${cc}.svg`
 
 const TRANSLATION_LANGUAGES = [
+  { code: "en", label: "English",    flagUrl: flag("us") },
   { code: "ar", label: "Arabic",     flagUrl: flag("sa") },
   { code: "fr", label: "French",     flagUrl: flag("fr") },
   { code: "es", label: "Spanish",    flagUrl: flag("es") },
@@ -284,7 +296,7 @@ export default function AudioCard({
   const [nextCooldown, setNextCooldown] = useState(0)
   const nextTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  const { isThrottled, cooldownLeft, guardedAction, cooldownSeconds } = useSpamGuard()
+  const { isThrottled, cooldownLeft, guardedAction } = useSpamGuard()
 
   // Start clip 0.3s before the sentence for natural listening context
   const PLAYBACK_START_OFFSET = 0.3
@@ -328,12 +340,6 @@ export default function AudioCard({
 
   // Fetch transcript — guard against undefined clip to avoid empty-ID requests
   const transcriptFetchStart = useRef<number>(performance.now())
-  useEffect(() => {
-    if (currentClip?.video_id) {
-      transcriptFetchStart.current = performance.now()
-      console.log(`[PERF] transcript REQUESTED  video=${currentClip.video_id}  idx=${currentVideoIndex}`)
-    }
-  }, [currentClip?.video_id, currentVideoIndex])
 
   const { data: transcriptData, isPending: isTranscriptLoading, isError: isTranscriptError, refetch: refetchTranscript } = useTranscript(
     !isParentLoading && !!currentClip ? (currentClip.video_id || "") : "",
@@ -390,14 +396,6 @@ export default function AudioCard({
     return () => window.removeEventListener("keydown", handleKey)
   }, [])
 
-  // Log when transcript data arrives
-  useEffect(() => {
-    if (transcriptData && currentClip?.video_id) {
-      const ms = Math.round(performance.now() - transcriptFetchStart.current)
-      const cached = ms < 10 // came from React Query cache
-      console.log(`[PERF] transcript ARRIVED  video=${currentClip.video_id}  sentences=${transcriptData.sentences?.length ?? 0}  +${ms}ms${cached ? ' (CACHE HIT)' : ''}`)
-    }
-  }, [transcriptData, currentClip?.video_id])
 
   // Clean word timestamps to prevent "ghost highlights"
   const sanitizedSentences = useMemo(() => {
@@ -425,7 +423,6 @@ export default function AudioCard({
   const sentencesInClip = sanitizedSentences
 
   // Translate all sentences in one batch call — result cached forever by React Query
-  console.log(`[TRANSLATE HOOK] video=${currentClip?.video_id}  sentences=${sentencesInClip.length}  lang=${translationLang}  enabled=${!!currentClip?.video_id && !!translationLang && sentencesInClip.length > 0}`)
   const { data: translationData, isPending: isTranslationLoading } = useTranslateBatch(
     sentencesInClip,
     currentClip?.video_id || "",
@@ -456,6 +453,7 @@ export default function AudioCard({
   // video_ids (same YouTube video at different timestamps) still re-trigger correctly
   useEffect(() => {
     hasStartedPlayback.current = false
+    console.log(`[PREV-DEBUG] index changed → idx=${currentVideoIndex} clip=${currentClip?.video_id} hasStartedPlayback reset`)
 
     // No cooldown on the first clip — only apply when the user has navigated past it
     if (currentVideoIndex === 0) return
@@ -511,8 +509,10 @@ export default function AudioCard({
   // Also re-runs when `player` becomes non-null so it retries if the transcript
   // resolved before the YouTube iframe was ready (race condition fix).
   useEffect(() => {
+    console.log(`[PREV-DEBUG] auto-play effect fired → idx=${currentVideoIndex} clip=${currentClip?.video_id} hasStarted=${hasStartedPlayback.current} player=${!!player} playerObj=${player} targetSentence=${targetSentence?.start_time ?? 'null'}`)
     if (targetSentence && !hasStartedPlayback.current && player) {
       const startTime = Math.max(0, targetSentence.start_time - PLAYBACK_START_OFFSET)
+      console.log(`[PREV-DEBUG] auto-play SEEKING → startTime=${startTime} on player=${player}`)
       seekTo(startTime)
       play()
       hasStartedPlayback.current = true
@@ -564,11 +564,12 @@ export default function AudioCard({
             </PopoverContent>
           </Popover>
 
-          <div className="flex items-center justify-center gap-1 flex-1">
+          <div className="flex items-center justify-center gap-1 flex-1 relative">
+            {isThrottled && <SpamGuardOverlay cooldownLeft={cooldownLeft} />}
             <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => guardedAction(prevVideo)} disabled={currentVideoIndex === 0}>
               <SkipBack size={16} />
             </Button>
-            <Button size="icon" className="h-10 w-10 rounded-full" onClick={togglePlayPause}>
+            <Button size="icon" className="h-10 w-10 rounded-full" onClick={() => guardedAction(togglePlayPause)}>
               {isPlaying ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
             </Button>
             <Button
@@ -595,7 +596,7 @@ export default function AudioCard({
               variant="ghost"
               size="icon"
               className={cn("h-9 w-9", targetSentence ? "text-primary" : "")}
-              onClick={repeatTargetSentence}
+              onClick={() => guardedAction(repeatTargetSentence)}
               disabled={!targetSentence}
             >
               <Repeat size={16} />
@@ -632,14 +633,6 @@ export default function AudioCard({
           </div>
         </div>
 
-        {/* Mobile throttle feedback — was silent before */}
-        {isThrottled && (
-          <div className="flex items-center justify-center py-1">
-            <p className="text-[11px] font-bold text-amber-500 animate-pulse">
-              Slow down! ({cooldownLeft}s)
-            </p>
-          </div>
-        )}
       </div>
 
       {/* ── DESKTOP FULL CONTROLS (>= md) ── */}
@@ -657,13 +650,8 @@ export default function AudioCard({
         </div>
 
         {/* Transport controls */}
-        <div className="flex items-center justify-center gap-4 relative">
-          {isThrottled && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-card/95 backdrop-blur-sm border border-border/50 shadow-lg px-6">
-              <p className="text-xs font-bold">Slow down! ({cooldownLeft}s)</p>
-            </div>
-          )}
-
+        <div id="tour-controls" className="flex items-center justify-center gap-4 relative">
+          {isThrottled && <SpamGuardOverlay cooldownLeft={cooldownLeft} />}
           <div className="flex flex-col items-center gap-1">
             <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full cursor-pointer" onClick={() => guardedAction(prevVideo)} disabled={currentVideoIndex === 0}>
               <SkipBack size={20} />
@@ -672,21 +660,21 @@ export default function AudioCard({
           </div>
 
           <div className="flex flex-col items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full cursor-pointer" onClick={skipBackward}>
+            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full cursor-pointer" onClick={() => guardedAction(skipBackward)}>
               <RotateCcw size={20} />
             </Button>
             <span className="text-xs text-muted-foreground">-10s</span>
           </div>
 
           <div className="flex flex-col items-center gap-1">
-            <Button size="icon" className="h-12 w-12 rounded-full bg-primary cursor-pointer" onClick={togglePlayPause}>
+            <Button size="icon" className="h-12 w-12 rounded-full bg-primary cursor-pointer" onClick={() => guardedAction(togglePlayPause)}>
               {isPlaying ? <Pause size={22} /> : <Play size={22} className="ml-0.5" />}
             </Button>
             <span className="text-xs text-muted-foreground">{isPlaying ? "Pause" : "Play"}</span>
           </div>
 
           <div className="flex flex-col items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full cursor-pointer" onClick={skipForward}>
+            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full cursor-pointer" onClick={() => guardedAction(skipForward)}>
               <RotateCcw size={20} className="scale-x-[-1]" />
             </Button>
             <span className="text-xs text-muted-foreground">+10s</span>
@@ -697,7 +685,7 @@ export default function AudioCard({
               variant="ghost"
               size="icon"
               className="h-11 w-11 rounded-full cursor-pointer"
-              onClick={repeatTargetSentence}
+              onClick={() => guardedAction(repeatTargetSentence)}
               disabled={!targetSentence}
             >
               <Repeat size={20} />
@@ -736,6 +724,7 @@ export default function AudioCard({
           <Popover open={desktopTranslationOpen} onOpenChange={setDesktopTranslationOpen}>
             <PopoverTrigger asChild>
               <Button
+                id="tour-translate"
                 variant="ghost"
                 size="sm"
                 className={cn(
@@ -778,6 +767,7 @@ export default function AudioCard({
       </div>
 
       <div className="border-t border-border/20 mb-1" />
+      <div id="tour-transcript">
       <TranscriptBox
         sentences={sentencesInClip}
         searchQuery={searchQuery}
@@ -806,6 +796,7 @@ export default function AudioCard({
         }}
         onTranscriptDetermined={onTranscriptDetermined}
       />
+      </div>
     </div>
     </div>
   )

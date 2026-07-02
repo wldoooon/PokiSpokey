@@ -52,10 +52,10 @@ const releases = [
         version: "v1.3.0",
         date: "January 28, 2026",
         title: "AI Credits Economy & Subscription Tiers",
-        description: "We launched the full subscription model with five tiers, an AI credits-based token economy, and real-time usage tracking synced to your account.",
+        description: "We launched the full subscription model with four tiers, an AI credits-based token economy, and real-time usage tracking synced to your account.",
         changes: [
             { type: "feat", description: "Introduced AI credits — each AI Assistant response deducts credits based on response length." },
-            { type: "feat", description: "Launched five subscription tiers: Free, Basic ($4.99/mo), Pro ($8.99/mo), Premium ($14.99/mo), and Max ($18.99/mo)." },
+            { type: "feat", description: "Launched four subscription tiers: Free, Basic ($4.99/mo), Pro ($8.99/mo), and Max ($18.99/mo)." },
         ]
     },
 ];

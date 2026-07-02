@@ -12,12 +12,15 @@ export type FeatureUsage = {
 
 type UsageState = {
   usage: Record<string, FeatureUsage>;
+  isLoaded: boolean;
   updateUsage: (feature: string, usage: Partial<FeatureUsage>) => void;
   setAllUsage: (usage: Record<string, FeatureUsage>) => void;
+  reset: () => void;
 };
 
 export const useUsageStore = create<UsageState>()((set) => ({
   usage: {},
+  isLoaded: false,
   updateUsage: (feature, newUsage) =>
     set((state) => ({
       usage: {
@@ -32,5 +35,7 @@ export const useUsageStore = create<UsageState>()((set) => ({
         },
       },
     })),
-  setAllUsage: (usage) => set({ usage }),
+  setAllUsage: (usage) => set({ usage, isLoaded: true }),
+  reset: () => set({ usage: {}, isLoaded: false }),
 }));
+

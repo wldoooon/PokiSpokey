@@ -67,8 +67,6 @@ export function YoutubePlayer({
     const init = () => {
       if (cancelledRef.current || !containerRef.current) return
 
-      console.log(`[YTP:${mountVideo}] init — startSeconds=${startSeconds}`)
-
       new window.YT.Player(containerRef.current, {
         videoId,
         width:  "100%",
@@ -79,11 +77,9 @@ export function YoutubePlayer({
         events: {
           onReady: (e: any) => {
             if (cancelledRef.current) return
-            console.log(`[YTP:${mountVideo}] onReady fired`)
             playerRef.current = e.target
             readyRef.current  = true
             if (pendingRef.current) {
-              console.log(`[YTP:${mountVideo}] flushing pending`, pendingRef.current)
               try { e.target.loadVideoById(pendingRef.current) } catch { /* ignore */ }
               pendingRef.current = null
             }
@@ -91,13 +87,10 @@ export function YoutubePlayer({
           },
           onStateChange: (e: any) => {
             if (cancelledRef.current) return
-            // Always calls the LATEST onStateChange from video-player-card,
-            // so activeKey and isMuted are never stale.
             onStateChangeRef.current?.({ data: e.data, target: e.target })
           },
           onError: (e: any) => {
             if (cancelledRef.current) return
-            console.warn(`[YTP:${mountVideo}] error code=${e.data}`)
             onErrorRef.current?.({ data: e.data })
           },
         },
@@ -116,7 +109,6 @@ export function YoutubePlayer({
     }
 
     return () => {
-      console.log(`[YTP:${mountVideo}] cleanup`)
       cancelledRef.current = true
       readyRef.current = false
       try { playerRef.current?.destroy() } catch { /* ignore */ }
@@ -133,15 +125,12 @@ export function YoutubePlayer({
     const payload = { videoId, startSeconds }
 
     if (!readyRef.current || !playerRef.current) {
-      console.log(`[YTP] videoId changed → player not ready, queuing`, payload)
       pendingRef.current = payload
       return
     }
 
-    console.log(`[YTP] videoId changed → loadVideoById`, payload)
-    try { playerRef.current.loadVideoById(payload) } catch (err) {
-      console.error(`[YTP] loadVideoById threw`, err)
-    }
+    console.log(`[PREV-DEBUG] YoutubePlayer loadVideoById payload=`, payload, `playerRef=`, playerRef.current)
+    try { playerRef.current.loadVideoById(payload) } catch { }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId])
 

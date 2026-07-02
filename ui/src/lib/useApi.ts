@@ -3,6 +3,7 @@
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { Clips, TranscriptResponse, SearchResponse } from "@/lib/types";
 import { apiClient } from "@/lib/apiClient";
+import { useUsageStore } from "@/stores/usage-store";
 
 export const fetchSearchResults = async (
   query: string,
@@ -22,14 +23,28 @@ export const fetchSearchResults = async (
     params.append("sub_category", subCategory);
   }
 
-  const t0 = performance.now();
   const response = await apiClient.get<SearchResponse>(
     `/api/v1/search?${params.toString()}`,
   );
-  const ms = Math.round(performance.now() - t0);
-  console.log(`[PERF] search API  q="${query}" page=${pageParam}  → ${ms}ms  hits=${response.data?.hits?.length ?? 0}  total=${response.data?.total ?? 0}`);
+
+  // ── Live usage meter update ───────────────────────────────────────────────
+  // The backend injects RateLimit-* headers on every search response.
+  // Read them here and push into the store so the sidebar meter updates
+  // immediately after each search without needing a full page refresh.
+  const remaining = parseInt(response.headers["ratelimit-remaining"] ?? "", 10);
+  const limit = parseInt(response.headers["ratelimit-limit"] ?? "", 10);
+  if (!isNaN(remaining) && !isNaN(limit)) {
+    useUsageStore.getState().updateUsage("search", {
+      remaining,
+      limit,
+      current: Math.max(0, limit - remaining),
+    });
+  }
+  // ── END live update ───────────────────────────────────────────────────────
+
   return response.data;
 };
+
 
 export const useSearch = (
   query: string,
@@ -91,12 +106,9 @@ export const fetchTranscript = async (
   if (centerPosition !== undefined) {
     params.append("center_position", centerPosition.toString());
   }
-  const t0 = performance.now();
   const response = await apiClient.get<TranscriptResponse>(
     `/api/v1/videos/${videoId}/transcript?${params.toString()}`,
   );
-  const ms = Math.round(performance.now() - t0);
-  console.log(`[PERF] transcript  video=${videoId}  → ${ms}ms  sentences=${response.data?.sentences?.length ?? 0}`);
   return response.data;
 };
 
@@ -159,17 +171,11 @@ export const fetchTranslateBatch = async (
   targetLang: string,
   sourceLang: string = "auto",
 ): Promise<TranslateBatchResponse> => {
-  console.log(`[TRANSLATE] → request  sentences=${sentences.length}  lang=${targetLang}  totalChars=${sentences.join("").length}`)
   const response = await apiClient.post<TranslateBatchResponse>(
     "/api/v1/translate",
     { sentences, target_lang: targetLang, source_lang: sourceLang },
   );
-  const data = response.data
-  console.log(`[TRANSLATE] ← response  translations=${data.translations?.length ?? 0}  expected=${sentences.length}  match=${data.translations?.length === sentences.length}`)
-  if (data.translations?.length !== sentences.length) {
-    console.warn(`[TRANSLATE] ⚠ count mismatch — sent ${sentences.length}, got ${data.translations?.length}`)
-  }
-  return data;
+  return response.data;
 };
 
 /**
@@ -187,10 +193,7 @@ export const useTranslateBatch = (
 
   return useQuery<TranslateBatchResponse, Error>({
     queryKey: ["translation", videoId, position, targetLang, sentenceTexts.length],
-    queryFn: () => {
-      console.log(`[TRANSLATE] queryFn fired  video=${videoId}  position=${position}  sentences=${sentenceTexts.length}  lang=${targetLang}`)
-      return fetchTranslateBatch(sentenceTexts, targetLang!, "auto")
-    },
+    queryFn: () => fetchTranslateBatch(sentenceTexts, targetLang!, "auto"),
     enabled: !!videoId && !!targetLang && sentences.length > 0,
     staleTime: Infinity,
     gcTime: 1000 * 60 * 30,

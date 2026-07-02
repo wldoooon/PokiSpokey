@@ -37,19 +37,24 @@ class TranslationService:
         if not sentences:
             return []
 
-        joined = SEPARATOR.join(sentences)
-        joined_chars = len(joined)
+        # Use HTML tags for Endpoint A to preserve context and guarantee boundaries
+        joined_html = "".join(f"<p>{html.escape(s)}</p>" for s in sentences)
+        joined_chars = len(joined_html)
         logger.info(f"[TRANSLATE] START  sentences={len(sentences)}  chars={joined_chars}  lang={target_lang}")
 
         # Endpoint A — fastest, best quality, no rate limits
         try:
-            translated_joined = await self._endpoint_a(joined, target_lang, source_lang)
-            parts = translated_joined.split(SEPARATOR)
+            translated_joined = await self._endpoint_a(joined_html, target_lang, source_lang)
+            import re
+            # Extract everything between <p> and </p>
+            parts = re.findall(r"<p>(.*?)</p>", translated_joined, flags=re.IGNORECASE | re.DOTALL)
+            parts = [html.unescape(p).strip() for p in parts]
+            
             if len(parts) == len(sentences):
                 logger.info(f"[TRANSLATE] endpoint_a OK  parts={len(parts)}")
-                return [p.strip() for p in parts]
+                return parts
             logger.warning(
-                f"[TRANSLATE] endpoint_a separator mismatch: expected {len(sentences)}, got {len(parts)}. Falling back to B."
+                f"[TRANSLATE] endpoint_a HTML tag mismatch: expected {len(sentences)}, got {len(parts)}. Falling back to B."
             )
         except Exception as e:
             logger.warning(f"[TRANSLATE] endpoint_a FAILED ({type(e).__name__}: {e}). Falling back to B.")

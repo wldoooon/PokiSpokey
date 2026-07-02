@@ -5,22 +5,15 @@ import { apiClient } from "@/lib/apiClient";
 import type { LoginResponse, SignupResponse, UserRead } from "@/lib/authTypes";
 import axios from "axios";
 
-import { useUsageStore } from "@/stores/usage-store";
 import { toastManager } from "@/components/ui/toast";
 
 export function useMeQuery() {
-  const setAllUsage = useUsageStore((state) => state.setAllUsage);
-
   return useQuery<UserRead | null>({
     queryKey: ["me"],
     queryFn: async () => {
       try {
         const res = await apiClient.get<UserRead>("/auth/me");
-        const data = res.data;
-        if (data.usage) {
-          setAllUsage(data.usage);
-        }
-        return data;
+        return res.data;
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 401) {
           return null;

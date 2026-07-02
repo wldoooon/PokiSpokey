@@ -106,11 +106,8 @@ export default function VideoPlayerCard({
     stallTimerRef.current = setTimeout(() => {
       if (!mountedRef.current) return
       consecutiveAutoSkipsRef.current += 1
-      console.warn(`[VPC] STALL skip — consecutiveSkips=${consecutiveAutoSkipsRef.current}`)
       if (consecutiveAutoSkipsRef.current <= 5) {
         usePlayerStore.getState().nextVideo()
-      } else {
-        console.error('[VPC] STALL cap reached (5) — stopping auto-skip')
       }
     }, 6000)
   }
@@ -119,45 +116,35 @@ export default function VideoPlayerCard({
     try {
       if (player && typeof (player as any)[fn] === 'function') {
         ; (player as any)[fn](...args)
-      } else if (player) {
-        console.warn(`[VPC] safeCall: method "${fn}" not available on player`)
       }
-    } catch (err) {
-      console.error(`[VPC] safeCall "${fn}" threw:`, err)
-    }
+    } catch { }
   }
 
   // ── Sync effect: fires when active slot or clip ids change ────────────────
   const activeClipId = activeKey === 'A' ? clipA?.video_id : clipB?.video_id
 
   useEffect(() => {
-    console.log(`[VPC] syncEffect — activeKey=${activeKey} activeClipId=${activeClipId} idx=${currentVideoIndex} clipA=${clipA?.video_id} clipB=${clipB?.video_id}`)
-
     let currentActive: YTPlayer | null = null
     if (activeKey === 'A') currentActive = playerARef.current
     if (activeKey === 'B') currentActive = playerBRef.current
 
-    if (!currentActive) {
-      console.warn(`[VPC] syncEffect — active player${activeKey} ref is NULL (not ready yet)`)
-    }
-
+    console.log(`[PREV-DEBUG] syncEffect setPlayer activeKey=${activeKey} idx=${currentVideoIndex} currentActive=${currentActive}`)
     setPlayer(currentActive)
     hasEverPlayedRef.current = false
     clearStallTimer()
 
     const syncSinglePlayer = (key: 'A' | 'B', player: YTPlayer | null) => {
-      if (!player) {
-        console.warn(`[VPC] syncSinglePlayer(${key}) — player ref null, skipping`)
-        return
-      }
+      if (!player) return
       const isActuallyActive = key === activeKey
       const clip = key === 'A' ? clipA : clipB
       if (!clip) return
 
       if (isActuallyActive) {
         const willSeek = lastSeekedClipId.current !== clip.video_id
+        console.log(`[PREV-DEBUG] syncEffect slot=${key} clip=${clip.video_id} willSeek=${willSeek} lastSeeked=${lastSeekedClipId.current} playerRef=${player}`)
         if (willSeek) {
           const exactStart = getClipStart(clip);
+          console.log(`[PREV-DEBUG] syncEffect SEEKING slot=${key} exactStart=${exactStart} playerRef=${player}`)
           safeCall(player, 'seekTo', exactStart, true)
           lastSeekedClipId.current = clip.video_id
         }
@@ -170,7 +157,6 @@ export default function VideoPlayerCard({
           safeCall(player, 'setVolume', 100)
         }
       } else {
-        console.log(`[VPC] syncSinglePlayer(${key}) BACKGROUND — mute+pause video=${clip.video_id}`)
         safeCall(player, 'mute')
         safeCall(player, 'pauseVideo')
       }
@@ -216,17 +202,10 @@ export default function VideoPlayerCard({
 
   // ── State change handler ──────────────────────────────────────────────────
   const onStateChange = (event: { data: number; target: any }, key: 'A' | 'B') => {
-    const stateNames: Record<string, string> = { '-1': 'unstarted', '0': 'ended', '1': 'playing', '2': 'paused', '3': 'buffering', '5': 'cued' }
-    const stateName = stateNames[String(event.data)] ?? String(event.data)
-    const stateClip = key === 'A' ? clipA : clipB
     const isActive = key === activeKey
-    console.log(`[VPC] stateChange player${key} — ${stateName} video=${stateClip?.video_id} isActive=${isActive} hasPlayed=${hasEverPlayedRef.current} ${T()}`)
 
     if (!isActive) {
-      if (event.data === 1) {
-        console.log(`[VPC] background player${key} started playing — muting it`)
-        safeCall(event.target, 'mute')
-      }
+      if (event.data === 1) safeCall(event.target, 'mute')
       return
     }
 
@@ -238,7 +217,6 @@ export default function VideoPlayerCard({
     const isNowPlaying = event.data === 1
 
     if (isNowPlaying && !isMuted) {
-      console.log(`[VPC] active player${key} playing — unMute`)
       safeCall(event.target, 'unMute')
     }
 
@@ -256,14 +234,17 @@ export default function VideoPlayerCard({
     // Stall detection — only before first play (avoids triggering on user-pause)
     if (!hasEverPlayedRef.current) {
       if (event.data === -1) {
-        // unstarted: player hasn't started loading yet — start stall clock
-        console.log(`[VPC] stall timer started (unstarted) player${key}`)
         startStallTimer()
       } else if (event.data === 3) {
-        // buffering: player IS loading — it's making progress, clear the stall clock
-        // (a new timer will restart if it gets stuck buffering without ever playing)
-        console.log(`[VPC] buffering detected — stall timer cleared (player is loading)`)
         clearStallTimer()
+        // Seek to the clip's keyword timestamp when the player starts buffering.
+        // seekTo() calls issued immediately after loadVideoById() are ignored because
+        // the player is mid-load. State=3 (buffering) is the earliest reliable moment
+        // to seek — the player has loaded enough data to accept the command.
+        const clip = key === 'A' ? clipA : clipB
+        if (clip) {
+          safeCall(event.target, 'seekTo', getClipStart(clip), true)
+        }
       }
     } else {
       // After first play: always clear stall timer
@@ -277,14 +258,11 @@ export default function VideoPlayerCard({
 
   // ── Error handler ─────────────────────────────────────────────────────────
   const onVideoError = (event: { data: number }, key: 'A' | 'B') => {
-    const errorNames: Record<number, string> = { 2: 'invalid_param', 5: 'html5_error', 100: 'not_found', 101: 'embed_not_allowed', 150: 'embed_not_allowed_2' }
-    console.error(`[VPC] onError player${key} — code=${event.data} (${errorNames[event.data] ?? 'unknown'}) isActive=${key === activeKey}`)
     if (key !== activeKey) return
     if ([100, 101, 150].includes(event.data)) {
       clearStallTimer()
       consecutiveAutoSkipsRef.current += 1
       if (consecutiveAutoSkipsRef.current <= 5) {
-        console.log(`[VPC] error-skip → nextVideo`)
         usePlayerStore.getState().nextVideo()
       }
     }
@@ -296,85 +274,64 @@ export default function VideoPlayerCard({
   useEffect(() => {
     if (!clipA) return
     const liveActiveKey = (['A', 'B'] as const)[usePlayerStore.getState().currentVideoIndex % 2]
-    console.log(`[VPC] recycleEffect A — new video=${clipA.video_id} liveActive=${liveActiveKey} playerARef=${!!playerARef.current}`)
-    if (liveActiveKey !== 'A') {
-      safeCall(playerARef.current, 'pauseVideo')
-    }
+    if (liveActiveKey !== 'A') safeCall(playerARef.current, 'pauseVideo')
   }, [clipA?.video_id])
 
   useEffect(() => {
     if (!clipB) return
     const liveActiveKey = (['A', 'B'] as const)[usePlayerStore.getState().currentVideoIndex % 2]
-    console.log(`[VPC] recycleEffect B — new video=${clipB.video_id} liveActive=${liveActiveKey} playerBRef=${!!playerBRef.current}`)
-    if (liveActiveKey !== 'B') {
-      safeCall(playerBRef.current, 'pauseVideo')
-    }
+    if (liveActiveKey !== 'B') safeCall(playerBRef.current, 'pauseVideo')
   }, [clipB?.video_id])
 
   // ── onReady handler ───────────────────────────────────────────────────────
   const onReady = (player: YTPlayer, key: 'A' | 'B') => {
-    if (!player) {
-      console.error(`[VPC] onReady player${key} — player is null/undefined!`)
-      return
-    }
-    const readyMs = Math.round(performance.now() - playerMountTimeRef.current)
+    if (!player) return
     const clip = key === 'A' ? clipA : clipB
     const isActive = key === activeKey
-    console.log(`[VPC] onReady player${key} — video=${clip?.video_id} isActive=${isActive} isMuted=${isMuted} +${readyMs}ms`)
+
+    if (isActive) {
+      try {
+        const initialState = typeof player.getPlayerState === 'function' ? player.getPlayerState() : undefined
+        if (initialState === -1) {
+          clearStallTimer()
+          consecutiveAutoSkipsRef.current += 1
+          if (consecutiveAutoSkipsRef.current <= 5) usePlayerStore.getState().nextVideo()
+          return
+        }
+      } catch { }
+    }
 
     if (key === 'A') playerARef.current = player
     if (key === 'B') playerBRef.current = player
 
-    // Mark the clip as already positioned (via playerVars.start in YoutubePlayer constructor).
-    // This prevents syncEffect from issuing a redundant seekTo when the buffer player
-    // becomes active — which was causing the "sound cuts off" on navigation.
-    if (clip) {
-      lastSeekedClipId.current = clip.video_id
-    }
+    if (clip) lastSeekedClipId.current = clip.video_id
 
     if (isActive) {
       setPlayer(player)
       try {
-        if (typeof player.getDuration === 'function') {
-          setPlayerState({ duration: player.getDuration() })
-        }
+        if (typeof player.getDuration === 'function') setPlayerState({ duration: player.getDuration() })
       } catch { }
-      if (!isMuted) {
-        console.log(`[VPC] onReady player${key} ACTIVE — unMute`)
-        safeCall(player, 'unMute')
-      } else {
-        console.log(`[VPC] onReady player${key} ACTIVE — keeping muted (isMuted=true)`)
-      }
-      // Explicitly force play since browser autoplay policies sometimes block the automatic
-      // playerVars.autoplay on initial mount, resulting in a black/paused screen.
+      if (!isMuted) safeCall(player, 'unMute')
       safeCall(player, 'playVideo')
     } else {
-      console.log(`[VPC] onReady player${key} BACKGROUND — setting up turbo buffer`)
       safeCall(player, 'mute')
 
       const getLiveActiveKey = () => (['A', 'B'] as const)[usePlayerStore.getState().currentVideoIndex % 2]
 
       const triggerBuffer = () => {
         if (!mountedRef.current) return
-        if (key === getLiveActiveKey()) {
-          console.log(`[VPC] triggerBuffer player${key} — slot is now ACTIVE, skipping buffer`)
-          return
-        }
+        if (key === getLiveActiveKey()) return
         const liveRef = key === 'A' ? playerARef.current : playerBRef.current
-        console.log(`[VPC] triggerBuffer player${key} — playVideo for 1.2s buffer`)
         safeCall(liveRef, 'playVideo')
         setTimeout(() => {
           if (!mountedRef.current) return
           if (key !== getLiveActiveKey()) {
             const ref = key === 'A' ? playerARef.current : playerBRef.current
-            console.log(`[VPC] triggerBuffer player${key} — pauseVideo after buffer window`)
             safeCall(ref, 'pauseVideo')
           }
         }, 1200)
       }
 
-      // Wait 3s for the active player to establish its stream, then pre-buffer.
-      // triggerBuffer() checks if we became active in the meantime and skips if so.
       setTimeout(() => triggerBuffer(), 3000)
     }
   }

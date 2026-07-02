@@ -175,46 +175,52 @@ async def send_password_reset_otp(
 ) -> Tuple[bool, str]:
     """
     Send password reset OTP.
-    
-    Returns (success, message).
-    Always returns success to not reveal if email exists.
+
+    Always returns success — never reveals whether the email exists.
     """
-    # Find user
     statement = select(User).where(User.email == email)
     result = await db.exec(statement)
     user = result.first()
-    
+
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account found with this email address."
-        )
-    
-    # Generate and store OTP
+        # Silently succeed — don't reveal if email exists
+        return True, "If that account exists, we sent a reset code."
+
     otp = generate_otp(settings.OTP_LENGTH)
     await redis.set(f"reset:{email}", otp, ex=settings.OTP_EXPIRE_SECONDS)
-    
-    # Send email
+    # Reset attempt counter whenever a fresh OTP is issued
+    await redis.set(f"reset_attempts:{email}", "0", ex=settings.OTP_EXPIRE_SECONDS)
+
     await email_service.send_otp([email], otp)
     logger.info(f"Password reset OTP sent to {email}")
-    
-    return True, "Code sent successfully."
+
+    return True, "If that account exists, we sent a reset code."
 
 
 async def verify_reset_otp(redis: Redis, email: str, otp: str) -> bool:
     """
     Verify the password reset OTP without consuming it.
-    
-    Raises HTTPException on invalid OTP.
+
+    Raises HTTPException on invalid OTP or too many attempts.
     """
+    attempts = await redis.get(f"reset_attempts:{email}")
+    if attempts and int(attempts) >= settings.VERIFY_MAX_ATTEMPTS:
+        await redis.delete(f"reset:{email}")
+        await redis.delete(f"reset_attempts:{email}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Please request a new code."
+        )
+
     stored_otp = await redis.get(f"reset:{email}")
-    
     if not stored_otp or stored_otp != otp:
+        await redis.incr(f"reset_attempts:{email}")
+        await redis.expire(f"reset_attempts:{email}", settings.OTP_EXPIRE_SECONDS)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired code"
         )
-    
+
     return True
 
 
@@ -226,38 +232,57 @@ async def reset_password(
     new_password: str
 ) -> User:
     """
-    Verify OTP and reset the password.
-    
+    Verify OTP, reset the password, and revoke all existing sessions.
+
     Returns the updated user.
     """
-    # Verify OTP first
+    # Re-verify OTP with attempt tracking (guards against bypassing /verify-reset-otp)
+    attempts = await redis.get(f"reset_attempts:{email}")
+    if attempts and int(attempts) >= settings.VERIFY_MAX_ATTEMPTS:
+        await redis.delete(f"reset:{email}")
+        await redis.delete(f"reset_attempts:{email}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Please request a new code."
+        )
+
     stored_otp = await redis.get(f"reset:{email}")
     if not stored_otp or stored_otp != otp:
+        await redis.incr(f"reset_attempts:{email}")
+        await redis.expire(f"reset_attempts:{email}", settings.OTP_EXPIRE_SECONDS)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired code"
         )
-    
+
     # Find user
     statement = select(User).where(User.email == email)
     result = await db.exec(statement)
     user = result.first()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+
     # Update password
     user.hashed_password = get_password_hash(new_password)
     user.password_changed_at = datetime.now(timezone.utc)
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    
-    # Cleanup Redis
+
+    # Revoke ALL existing sessions so attackers lose access immediately
+    session_tokens = await redis.smembers(f"user_sessions:{user.id}")
+    if session_tokens:
+        refresh_keys = [f"refresh:{token}" for token in session_tokens]
+        await redis.delete(*refresh_keys)
+        await redis.delete(f"user_sessions:{user.id}")
+
+    # Cleanup OTP keys
     await redis.delete(f"reset:{email}")
-    
-    logger.info(f"Password reset successful for {email}")
+    await redis.delete(f"reset_attempts:{email}")
+
+    logger.info(f"Password reset successful for {email} — {len(session_tokens) if session_tokens else 0} session(s) revoked")
     return user

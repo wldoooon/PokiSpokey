@@ -16,6 +16,8 @@ import { NavGroup } from "@/components/nav-group";
 import { footerNavLinks, navGroups } from "@/components/app-shared";
 import { UsageMeter } from "@/components/usage-meter";
 import { useAuthStore } from "@/stores/auth-store";
+import { BookOpen } from "lucide-react";
+import { openOnboarding } from "@/components/onboarding-dialog";
 
 export function AppSidebar() {
 	const authStatus = useAuthStore((s) => s.status)
@@ -36,6 +38,16 @@ export function AppSidebar() {
 					</span>
 				</a>
 			</SidebarHeader>
+			<div className="px-2 py-1">
+				<SidebarMenu>
+					<SidebarMenuItem>
+						<SidebarMenuButton onClick={openOnboarding} className="bg-primary text-primary-foreground font-medium hover:bg-primary/90 hover:text-primary-foreground" size="default">
+							<BookOpen className="shrink-0" />
+							<span>Getting Started</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				</SidebarMenu>
+			</div>
 			<SidebarContent>
 				{visibleGroups.map((group, index) => (
 					<NavGroup key={`sidebar-group-${index}`} {...group} />

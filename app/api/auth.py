@@ -56,7 +56,11 @@ async def _set_auth_cookies(response: Response, access_token: str, user_id: str,
     ttl = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60  # days → seconds
     await redis.set(f"refresh:{refresh_token}", str(user_id), ex=ttl)
 
-    # 3. Refresh token cookie (same security settings, longer max_age)
+    # 3. Track token in user's session set for bulk revocation (e.g. on password reset)
+    await redis.sadd(f"user_sessions:{user_id}", refresh_token)
+    await redis.expire(f"user_sessions:{user_id}", ttl)
+
+    # 4. Refresh token cookie (same security settings, longer max_age)
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=refresh_token,
@@ -200,7 +204,10 @@ async def logout(
     # Revoke refresh token from Redis so it can never be used again
     refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
     if refresh_token:
+        user_id = await redis.get(f"refresh:{refresh_token}")
         await redis.delete(f"refresh:{refresh_token}")
+        if user_id:
+            await redis.srem(f"user_sessions:{user_id}", refresh_token)
 
     # Delete access token cookie
     response.delete_cookie(
@@ -252,10 +259,11 @@ async def refresh(
             detail="User not found or inactive."
         )
 
-    # TOKEN ROTATION: invalidate the old refresh token immediately
+    # TOKEN ROTATION: invalidate the old refresh token and remove from session set
     await redis.delete(f"refresh:{refresh_token}")
+    await redis.srem(f"user_sessions:{str(user.id)}", refresh_token)
 
-    # Issue fresh access token + new refresh token
+    # Issue fresh access token + new refresh token (new token is added to session set)
     new_access_token = create_access_token(data={"sub": str(user.id)})
     await _set_auth_cookies(response, new_access_token, str(user.id), redis)
 

@@ -84,8 +84,8 @@ class User(UserBase, table=True):
 class UserCreate(SQLModel):
     """What the user sends when registering"""
     email: str
-    password: Optional[str] | None = None
-    full_name: Optional[str] | None = None
+    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
+    full_name: Optional[str] = Field(default=None, max_length=255)
 
 
 class UserRead(UserBase):

@@ -188,6 +188,48 @@
     }
   }
 
+  @keyframes gold-shimmer {
+    0%, 25%   { background-position: -250% center, center; }
+    75%, 100% { background-position:  250% center, center; }
+  }
+
+  .badge-pro {
+    background: linear-gradient(
+      105deg,
+      #92710D 0%,
+      #C9A227 25%,
+      #FFD700 40%,
+      #FFFACD 50%,
+      #FFD700 60%,
+      #C9A227 75%,
+      #92710D 100%
+    );
+    background-size: 200% auto;
+    animation: gold-shine 3s linear infinite;
+    color: #3D2400;
+    border: 1px solid #B8860B;
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.4);
+  }
+
+  .badge-max {
+    background: linear-gradient(
+      105deg,
+      #5C4A00 0%,
+      #B8860B 20%,
+      #FFD700 35%,
+      #FFFFFF 50%,
+      #FFD700 65%,
+      #B8860B 80%,
+      #5C4A00 100%
+    );
+    background-size: 200% auto;
+    animation: gold-shine 2s linear infinite;
+    color: #2A1A00;
+    border: 1px solid #92710D;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4), 0 0 2px rgba(255, 215, 0, 0.6);
+  }
+
   @keyframes spin-slow {
     from {
       transform: rotate(0deg);
@@ -360,4 +402,22 @@
   38%  { clip-path: inset(48% 0 0 0);  filter: blur(3px);  }
   60%  { clip-path: inset(48% 0 0 0);  filter: blur(3px);  }
   100% { clip-path: inset(0% 0 0 0);   filter: blur(0px);  }
+}
+
+/* driver.js popover overrides */
+.driver-popover {
+  border-radius: 26px !important;
+}
+.driver-popover-footer button {
+  border-radius: 26px !important;
+}
+.driver-popover.tour-with-video {
+  min-width: 360px !important;
+  max-width: 360px !important;
+}
+.driver-popover.tour-with-video .driver-popover-description video {
+  margin: 0 0 10px 0;
+  border-radius: 8px;
+  display: block;
+  width: 100%;
 }

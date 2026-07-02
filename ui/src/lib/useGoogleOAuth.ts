@@ -66,14 +66,8 @@ export function useGoogleOAuth() {
         event.origin.includes("127.0.0.1:5001");
 
       if (!isAllowedOrigin) {
-        console.warn(
-          "DEBUG: Ignored message from unknown origin:",
-          event.origin,
-        );
         return;
       }
-
-      console.log("DEBUG: Received auth message:", event.data);
       const { type, user, error } = event.data;
 
       if (type === "oauth-success") {
@@ -140,17 +134,22 @@ export function useGoogleOAuth() {
 
         popupRef.current = popup;
 
-        // Poll to check if popup was closed without completing
+        // Poll to check if popup was closed without completing.
+        // We add a short delay before resolving as "cancelled" so any in-flight
+        // postMessage from the popup has time to be delivered and processed first.
         pollTimerRef.current = setInterval(() => {
           if (popup.closed) {
             cleanup();
-            // If we haven't received a message, user closed the popup
             if (resolveRef.current) {
-              resolveRef.current({
-                success: false,
-                error: "Authentication cancelled",
-              });
-              resolveRef.current = null;
+              setTimeout(() => {
+                if (resolveRef.current) {
+                  resolveRef.current({
+                    success: false,
+                    error: "Authentication cancelled",
+                  });
+                  resolveRef.current = null;
+                }
+              }, 300);
             }
           }
         }, 500);

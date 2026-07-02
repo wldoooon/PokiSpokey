@@ -12,11 +12,10 @@ import { useAuthStore } from "@/stores/auth-store"
 const easeOutQuint: [number, number, number, number] = [0.23, 1, 0.32, 1]
 
 const TIER_SPARKS: Record<string, number> = {
-  free:    50_000,
-  basic:   800_000,
-  pro:     5_000_000,
-  premium: 15_000_000,
-  max:     -1,
+  free:  15_000,
+  basic: 800_000,
+  pro:   5_000_000,
+  max:   15_000_000,
 }
 
 const menuItems = [
