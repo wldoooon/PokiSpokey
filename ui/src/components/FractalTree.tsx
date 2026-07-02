@@ -18,7 +18,6 @@ const FractalTree = ({
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
-        console.log("FractalTree: Initializing...");
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -88,7 +87,6 @@ const FractalTree = ({
         };
 
         const start = () => {
-            console.log("FractalTree: Rendering tree...");
             ctx.clearRect(0, 0, width, height);
             ctx.lineWidth = 1.0;
             ctx.strokeStyle = primaryColor;

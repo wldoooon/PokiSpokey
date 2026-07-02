@@ -1,43 +1,26 @@
-import hmac
-import hashlib
-import base64
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
-import httpx
-from dodopayments import AsyncDodoPayments
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from ..core.config import get_settings
 from ..core.logging import logger
+from ..core.dodo import dodo_client
 from ..models.user import User, UserTier
 from ..models.subscription import Subscription, SubscriptionStatus
 from ..models.invoice import Invoice, PaymentStatus
 from ..models.webhook_event import WebhookEvent
+from .usage_service import reset_ai_credits
 
 settings = get_settings()
 
-# ── Dodo SDK client ──────────────────────────────────────────────────────────
+# ── Maps ──────────────────────────────────────────────────────────────────────
 
-def _dodo_client() -> AsyncDodoPayments:
-    """
-    Returns an async Dodo SDK client.
-    Environment is controlled by DODO_ENVIRONMENT in .env:
-      "test_mode"  → test cards, no real money
-      "live_mode"  → real payments
-    """
-    return AsyncDodoPayments(
-        bearer_token=settings.DODO_API_KEY,
-        environment=settings.DODO_ENVIRONMENT,
-    )
-
-
-# ── Product → plan mapping ───────────────────────────────────────────────────
-
-def _build_product_map() -> dict[str, tuple[str, str]]:
-    s = get_settings()
-    return {
+def _build_maps() -> tuple[dict, dict]:
+    s = settings
+    product_map = {
         s.DODO_PRODUCT_BASIC_MONTHLY: ("basic", "monthly"),
         s.DODO_PRODUCT_BASIC_YEARLY:  ("basic", "yearly"),
         s.DODO_PRODUCT_PRO_MONTHLY:   ("pro",   "monthly"),
@@ -45,252 +28,81 @@ def _build_product_map() -> dict[str, tuple[str, str]]:
         s.DODO_PRODUCT_MAX_MONTHLY:   ("max",   "monthly"),
         s.DODO_PRODUCT_MAX_YEARLY:    ("max",   "yearly"),
     }
+    return product_map, {v: k for k, v in product_map.items()}
+
+PRODUCT_MAP, PLAN_TO_PRODUCT = _build_maps()
+
+PLAN_TO_TIER = {"basic": UserTier.BASIC, "pro": UserTier.PRO, "max": UserTier.MAX}
 
 
-PRODUCT_MAP = _build_product_map()
-
-PLAN_TO_TIER = {
-    "basic": UserTier.BASIC,
-    "pro":   UserTier.PRO,
-    "max":   UserTier.MAX,
-}
-
-
-# ── Checkout ─────────────────────────────────────────────────────────────────
-
-def _resolve_product_id(plan: str, billing_period: str) -> str:
-    """Resolves the Dodo product ID from plan name + billing period using server-side config."""
-    key = (plan.lower(), billing_period.lower())
-    mapping = {
-        ("basic", "monthly"): settings.DODO_PRODUCT_BASIC_MONTHLY,
-        ("basic", "yearly"):  settings.DODO_PRODUCT_BASIC_YEARLY,
-        ("pro",   "monthly"): settings.DODO_PRODUCT_PRO_MONTHLY,
-        ("pro",   "yearly"):  settings.DODO_PRODUCT_PRO_YEARLY,
-        ("max",   "monthly"): settings.DODO_PRODUCT_MAX_MONTHLY,
-        ("max",   "yearly"):  settings.DODO_PRODUCT_MAX_YEARLY,
-    }
-    product_id = mapping.get(key)
-    if not product_id:
-        raise ValueError(f"Unknown plan/period combination: {plan}/{billing_period}")
-    return product_id
-
+# ── Checkout + Portal ─────────────────────────────────────────────────────────
 
 async def create_checkout_url(user: User, plan: str, billing_period: str) -> str:
-    """
-    Creates a Dodo checkout session and returns the payment URL.
-    The user is redirected here — they pay on Dodo's page, not yours.
-
-    The actual plan upgrade happens later via the subscription.active webhook,
-    NOT here. Never trust the success redirect for access control.
-    """
-    product_id = _resolve_product_id(plan, billing_period)
-    async with _dodo_client() as client:
-        response = await client.checkout_sessions.create(
-            product_cart=[{"product_id": product_id, "quantity": 1}],
-            return_url=f"{settings.FRONTEND_URL}/billing/success",
-            customer={"email": user.email, "name": user.full_name or user.email},
-            metadata={"user_id": str(user.id)},
-        )
-        if not response.checkout_url:
-            raise ValueError("Dodo returned no checkout URL")
-        return response.checkout_url
-
-
-# ── Customer Portal ──────────────────────────────────────────────────────────
-
-DODO_API_BASE = {
-    "test_mode": "https://test.dodopayments.com",
-    "live_mode":  "https://api.dodopayments.com",
-}
+    product_id = PLAN_TO_PRODUCT.get((plan.lower(), billing_period.lower()))
+    if not product_id:
+        raise ValueError(f"Unknown plan/period: {plan}/{billing_period}")
+    customer = (
+        {"customer_id": user.dodo_customer_id}
+        if user.dodo_customer_id
+        else {"email": user.email, "name": user.full_name or user.email}
+    )
+    resp = await dodo_client.get().checkout_sessions.create(
+        product_cart=[{"product_id": product_id, "quantity": 1}],
+        return_url=f"{settings.FRONTEND_URL}/billing/success",
+        customer=customer,
+        metadata={"user_id": str(user.id)},
+    )
+    if not resp.checkout_url:
+        raise ValueError("Dodo returned no checkout URL")
+    return resp.checkout_url
 
 
-async def get_portal_url(user: User) -> str:
-    """
-    Returns the Dodo customer self-service portal URL.
-    User can cancel, update card, download invoices — without you building any UI.
 
-    The SDK doesn't cover this endpoint yet so we use httpx directly.
-    """
-    if not user.dodo_customer_id:
-        raise ValueError("User has no Dodo customer ID — they have never subscribed.")
-
-    base_url = DODO_API_BASE.get(settings.DODO_ENVIRONMENT, DODO_API_BASE["test_mode"])
-
-    async with httpx.AsyncClient(
-        base_url=base_url,
-        headers={
-            "Authorization": f"Bearer {settings.DODO_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        timeout=30.0,
-    ) as client:
-        response = await client.post(
-            f"/customers/{user.dodo_customer_id}/customer-portal",
-            json={"return_url": f"{settings.FRONTEND_URL}/billing"},
-        )
-        response.raise_for_status()
-        return response.json()["url"]
-
-
-# ── Webhook Signature Verification ──────────────────────────────────────────
-
-def verify_webhook_signature(
-    raw_body: bytes,
-    webhook_id: str,
-    webhook_timestamp: str,
-    webhook_signature: str,
-) -> bool:
-    """
-    Verifies the webhook came from Dodo using HMAC-SHA256 (Svix standard).
-
-    Dodo uses Svix for webhook delivery. The signed content is:
-      "{webhook_id}.{webhook_timestamp}.{raw_body}"
-
-    The secret starts with "whsec_" — that prefix is stripped before use.
-    Returns False if secret is missing or signature doesn't match.
-    """
-    secret = settings.DODO_WEBHOOK_SECRET
-    if not secret:
-        logger.warning("DODO_WEBHOOK_SECRET not set — rejecting all webhooks")
-        return False
-
-    signed_content = f"{webhook_id}.{webhook_timestamp}.{raw_body.decode('utf-8')}"
-    secret_bytes = base64.b64decode(secret.removeprefix("whsec_"))
-
-    computed = hmac.new(
-        secret_bytes,
-        signed_content.encode("utf-8"),
-        hashlib.sha256,
-    ).digest()
-    computed_b64 = base64.b64encode(computed).decode()
-
-    # Header may contain multiple space-separated signatures (key rotation)
-    for sig in webhook_signature.split(" "):
-        if sig.startswith("v1,") and hmac.compare_digest(sig[3:], computed_b64):
-            return True
-
-    return False
-
-
-# ── Webhook Dispatcher ───────────────────────────────────────────────────────
+# ── Webhook Dispatcher ────────────────────────────────────────────────────────
 
 async def handle_webhook(
     event_id: str,
     event_type: str,
-    payload: dict,
+    data: dict,
     raw_body: str,
     db: AsyncSession,
 ) -> None:
-    """
-    Routes each Dodo webhook event to the correct handler.
-
-    Idempotency: we insert the event log row first (unique on dodo_event_id).
-    If Dodo retries the same event, the select check returns early.
-    All DB writes happen in one transaction — no split-brain possible.
-    """
-    # Idempotency check — skip if already processed
-    result = await db.exec(
-        select(WebhookEvent).where(WebhookEvent.dodo_event_id == event_id)
-    )
-    if result.first():
-        logger.info(f"[WEBHOOK] Duplicate event skipped: {event_id}")
+    existing = await db.execute(select(WebhookEvent).where(WebhookEvent.dodo_event_id == event_id))
+    if existing.scalars().first():
+        logger.info(f"[WEBHOOK] Duplicate skipped: {event_id}")
         return
 
-    # Insert event log immediately as the idempotency lock
-    event_log = WebhookEvent(
-        dodo_event_id=event_id,
-        event_type=event_type,
-        payload=raw_body,
-        processed=False,
-    )
-    db.add(event_log)
+    ev = WebhookEvent(dodo_event_id=event_id, event_type=event_type, payload=raw_body, processed=False)
+    db.add(ev)
     await db.flush()
 
     try:
-        data = payload.get("data", {})
         logger.info(f"[WEBHOOK] Processing {event_type} id={event_id}")
-
-        if event_type == "subscription.active":
-            await _on_subscription_active(data, db, event_log)
-        elif event_type == "subscription.renewed":
-            await _on_subscription_renewed(data, db, event_log)
-        elif event_type == "subscription.cancelled":
-            await _on_subscription_cancelled(data, db, event_log)
-        elif event_type == "subscription.on_hold":
-            await _on_subscription_on_hold(data, db, event_log)
-        elif event_type == "subscription.expired":
-            await _on_subscription_expired(data, db, event_log)
-        elif event_type == "subscription.plan_changed":
-            await _on_subscription_plan_changed(data, db, event_log)
-        elif event_type == "payment.succeeded":
-            await _on_payment_succeeded(data, db, event_log)
-        elif event_type == "payment.failed":
-            await _on_payment_failed(data, db, event_log)
-        elif event_type == "refund.succeeded":
-            await _on_refund_succeeded(data, db, event_log)
+        handler = _HANDLERS.get(event_type)
+        if handler:
+            await handler(data, db, ev)
         elif event_type == "dispute.opened":
             logger.warning(f"[WEBHOOK] Dispute opened — manual review needed: {data}")
         else:
             logger.info(f"[WEBHOOK] Unhandled event type: {event_type}")
 
-        event_log.processed = True
-        db.add(event_log)
+        ev.processed = True
+        db.add(ev)
         await db.commit()
 
     except Exception as e:
-        # Rollback any partial writes (e.g. flushed subscription rows that didn't fully commit).
-        # Then open a clean transaction to persist the error record.
         await db.rollback()
-        event_log.processing_error = str(e)
-        event_log.processed = False
-        db.add(event_log)
+        ev.processing_error = str(e)
+        db.add(ev)
         try:
             await db.commit()
         except Exception:
-            logger.error(f"[WEBHOOK] Could not persist error record for event {event_id}")
+            logger.error(f"[WEBHOOK] Could not persist error for event {event_id}")
         logger.error(f"[WEBHOOK] Handler failed for {event_type}: {e}")
         raise
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
-async def _get_user_from_data(data: dict, db: AsyncSession) -> Optional[User]:
-    """
-    Finds the user from webhook data.
-    Priority: metadata.user_id → dodo_customer_id → email
-    """
-    user_id = data.get("metadata", {}).get("user_id")
-    if user_id:
-        user = await db.get(User, user_id)
-        if user:
-            return user
-
-    customer = data.get("customer", {})
-    dodo_customer_id = customer.get("customer_id")
-    if dodo_customer_id:
-        result = await db.exec(
-            select(User).where(User.dodo_customer_id == dodo_customer_id)
-        )
-        user = result.first()
-        if user:
-            return user
-
-    email = customer.get("email")
-    if email:
-        result = await db.exec(select(User).where(User.email == email))
-        return result.first()
-
-    return None
-
-
-async def _get_subscription(dodo_subscription_id: str, db: AsyncSession) -> Optional[Subscription]:
-    result = await db.exec(
-        select(Subscription).where(
-            Subscription.dodo_subscription_id == dodo_subscription_id
-        )
-    )
-    return result.first()
-
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _parse_dt(value: str | None) -> Optional[datetime]:
     if not value:
@@ -298,142 +110,188 @@ def _parse_dt(value: str | None) -> Optional[datetime]:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-# ── Subscription Handlers ────────────────────────────────────────────────────
+async def _get_user(data: dict, db: AsyncSession) -> Optional[User]:
+    """Priority: metadata.user_id → dodo_customer_id → email"""
+    if uid := data.get("metadata", {}).get("user_id"):
+        if user := await db.get(User, uid):
+            return user
+    customer = data.get("customer", {})
+    if cid := customer.get("customer_id"):
+        result = await db.execute(select(User).where(User.dodo_customer_id == cid))
+        if user := result.scalars().first():
+            return user
+    if email := customer.get("email"):
+        result = await db.execute(select(User).where(User.email == email))
+        return result.scalars().first()
+    return None
 
-async def _on_subscription_active(data: dict, db: AsyncSession, event_log: WebhookEvent) -> None:
-    """
-    First payment succeeded — create subscription row and upgrade user tier.
-    Both updates happen in the same transaction. No split-brain possible.
-    """
-    user = await _get_user_from_data(data, db)
+
+async def _get_sub(dodo_sub_id: str, db: AsyncSession, retries: int = 3, delay: float = 1.0) -> Optional[Subscription]:
+    for attempt in range(retries):
+        result = await db.execute(select(Subscription).where(Subscription.dodo_subscription_id == dodo_sub_id))
+        sub = result.scalars().first()
+        if sub:
+            await db.refresh(sub)  # reload after potential sleep to ensure valid session state
+            return sub
+        if attempt < retries - 1:
+            await asyncio.sleep(delay)
+    return None
+
+
+async def _patch_sub(sub: Subscription, db: AsyncSession, **values) -> None:
+    """Update subscription via SQLAlchemy update() — bypasses SQLModel sa_column descriptor conflicts on loaded instances."""
+    await db.execute(update(Subscription).where(Subscription.id == sub.id).values(**values))
+    await db.refresh(sub)
+
+
+# ── Subscription Handlers ─────────────────────────────────────────────────────
+
+async def _on_sub_active(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    user = await _get_user(data, db)
     if not user:
         raise ValueError(f"User not found for subscription.active: {data}")
 
     product_id = data.get("product_id", "")
     mapping = PRODUCT_MAP.get(product_id)
     if not mapping:
-        raise ValueError(f"Unknown product_id '{product_id}' — add it to PRODUCT_MAP or .env")
+        raise ValueError(f"Unknown product_id '{product_id}' — add to PRODUCT_MAP or .env")
+
     plan, billing_period = mapping
-    dodo_customer_id = data.get("customer", {}).get("customer_id", "")
+    dodo_cus_id = data.get("customer", {}).get("customer_id", "")
+    dodo_sub_id = data.get("subscription_id", "")
+    period_start = datetime.now(timezone.utc)
+    period_end   = _parse_dt(data.get("next_billing_date"))
 
     if not user.dodo_customer_id:
-        user.dodo_customer_id = dodo_customer_id
-
+        user.dodo_customer_id = dodo_cus_id
     user.tier = PLAN_TO_TIER[plan]
-
-    sub = Subscription(
-        user_id=user.id,
-        dodo_subscription_id=data.get("subscription_id", ""),
-        dodo_customer_id=dodo_customer_id,
-        dodo_product_id=product_id,
-        plan=plan,
-        billing_period=billing_period,
-        status=SubscriptionStatus.ACTIVE,
-        cancel_at_period_end=False,
-        current_period_start=_parse_dt(data.get("current_billing_period_start")),
-        current_period_end=_parse_dt(data.get("current_billing_period_end")),
-        started_at=_parse_dt(data.get("created_at")),
-    )
-
     db.add(user)
-    db.add(sub)
+
+    result = await db.execute(select(Subscription).where(Subscription.user_id == user.id))
+    existing = result.scalars().first()
+
+    if existing:
+        await _patch_sub(existing, db,
+            dodo_subscription_id=dodo_sub_id,
+            dodo_customer_id=dodo_cus_id,
+            dodo_product_id=product_id,
+            plan=plan,
+            billing_period=billing_period,
+            status=SubscriptionStatus.ACTIVE,
+            cancel_at_period_end=False,
+            current_period_start=period_start,
+            current_period_end=period_end,
+            started_at=_parse_dt(data.get("created_at")),
+        )
+        sub = existing
+    else:
+        sub = Subscription(
+            user_id=user.id,
+            dodo_subscription_id=dodo_sub_id,
+            dodo_customer_id=dodo_cus_id,
+            dodo_product_id=product_id,
+            plan=plan,
+            billing_period=billing_period,
+            status=SubscriptionStatus.ACTIVE,
+            cancel_at_period_end=False,
+            current_period_start=period_start,
+            current_period_end=period_end,
+            started_at=_parse_dt(data.get("created_at")),
+        )
+        db.add(sub)
+
+    await reset_ai_credits(db, user, PLAN_TO_TIER[plan])
     await db.flush()
-
-    event_log.user_id = user.id
-    event_log.subscription_id = sub.id
-    event_log.dodo_subscription_id = sub.dodo_subscription_id
-
+    ev.user_id = user.id
+    ev.subscription_id = sub.id
+    ev.dodo_subscription_id = sub.dodo_subscription_id
     logger.success(f"[WEBHOOK] {user.email} upgraded to {plan} ({billing_period})")
 
 
-async def _on_subscription_renewed(data: dict, db: AsyncSession, event_log: WebhookEvent) -> None:
-    """Renewal succeeded — extend the billing period dates."""
-    sub = await _get_subscription(data.get("subscription_id", ""), db)
+async def _on_sub_renewed(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    sub = await _get_sub(data.get("subscription_id", ""), db)
     if not sub:
         raise ValueError(f"Subscription not found: {data.get('subscription_id')}")
-
-    sub.status = SubscriptionStatus.ACTIVE
-    sub.cancel_at_period_end = False
-    sub.current_period_start = _parse_dt(data.get("current_billing_period_start"))
-    sub.current_period_end = _parse_dt(data.get("current_billing_period_end"))
-    sub.updated_at = datetime.now(timezone.utc)
-
-    db.add(sub)
-    event_log.subscription_id = sub.id
-    event_log.user_id = sub.user_id
-
+    await _patch_sub(sub, db,
+        status=SubscriptionStatus.ACTIVE,
+        cancel_at_period_end=False,
+        current_period_start=datetime.now(timezone.utc),
+        current_period_end=_parse_dt(data.get("next_billing_date")),
+    )
+    user = await db.get(User, sub.user_id)
+    if user:
+        await reset_ai_credits(db, user, user.tier)
+    ev.subscription_id = sub.id
+    ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] Subscription {sub.id} renewed until {sub.current_period_end}")
 
 
-async def _on_subscription_cancelled(data: dict, db: AsyncSession, event_log: WebhookEvent) -> None:
-    """
-    User cancelled — flag it but keep access until current_period_end.
-    Downgrade happens at subscription.expired, not here.
-    """
-    sub = await _get_subscription(data.get("subscription_id", ""), db)
+async def _on_sub_updated(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    sub = await _get_sub(data.get("subscription_id", ""), db)
+    if not sub:
+        logger.info(f"[WEBHOOK] subscription.updated — sub not found yet, skipping: {data.get('subscription_id')}")
+        return
+    cancel_at = data.get("cancel_at_next_billing_date")
+    if cancel_at is True:
+        await _patch_sub(sub, db, cancel_at_period_end=True)
+        logger.info(f"[WEBHOOK] Subscription {sub.id} marked for end-of-period cancellation")
+    elif cancel_at is False:
+        await _patch_sub(sub, db, cancel_at_period_end=False)
+        logger.info(f"[WEBHOOK] Subscription {sub.id} reactivated — cancellation undone")
+    ev.subscription_id = sub.id
+    ev.user_id = sub.user_id
+
+
+async def _on_sub_cancelled(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    sub = await _get_sub(data.get("subscription_id", ""), db)
     if not sub:
         raise ValueError(f"Subscription not found: {data.get('subscription_id')}")
+    user = await db.get(User, sub.user_id)
+    if not user:
+        raise ValueError(f"User {sub.user_id} not found during cancellation")
+    user.tier = UserTier.FREE
+    db.add(user)
+    await _patch_sub(sub, db,
+        status=SubscriptionStatus.CANCELLED,
+        cancel_at_period_end=False,
+        canceled_at=_parse_dt(data.get("cancelled_at")) or datetime.now(timezone.utc),
+    )
+    await reset_ai_credits(db, user, UserTier.FREE)
+    ev.subscription_id = sub.id
+    ev.user_id = sub.user_id
+    logger.info(f"[WEBHOOK] {user.email} downgraded to free — subscription cancelled")
 
-    sub.status = SubscriptionStatus.CANCELLED
-    sub.cancel_at_period_end = True
-    sub.canceled_at = datetime.now(timezone.utc)
-    sub.updated_at = datetime.now(timezone.utc)
 
-    db.add(sub)
-    event_log.subscription_id = sub.id
-    event_log.user_id = sub.user_id
-
-    logger.info(f"[WEBHOOK] Subscription {sub.id} cancelled — access until {sub.current_period_end}")
-
-
-async def _on_subscription_on_hold(data: dict, db: AsyncSession, event_log: WebhookEvent) -> None:
-    """Payment failed — dunning started. Flag it but don't cut access yet."""
-    sub = await _get_subscription(data.get("subscription_id", ""), db)
+async def _on_sub_on_hold(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    sub = await _get_sub(data.get("subscription_id", ""), db)
     if not sub:
         raise ValueError(f"Subscription not found: {data.get('subscription_id')}")
-
-    sub.status = SubscriptionStatus.ON_HOLD
-    sub.updated_at = datetime.now(timezone.utc)
-
-    db.add(sub)
-    event_log.subscription_id = sub.id
-    event_log.user_id = sub.user_id
-
+    await _patch_sub(sub, db, status=SubscriptionStatus.ON_HOLD)
+    ev.subscription_id = sub.id
+    ev.user_id = sub.user_id
     logger.warning(f"[WEBHOOK] Subscription {sub.id} on hold — dunning started")
 
 
-async def _on_subscription_expired(data: dict, db: AsyncSession, event_log: WebhookEvent) -> None:
-    """
-    Period ended — downgrade user to free.
-    Both subscription status and user tier update atomically.
-    """
-    sub = await _get_subscription(data.get("subscription_id", ""), db)
+async def _on_sub_expired(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    sub = await _get_sub(data.get("subscription_id", ""), db)
     if not sub:
         raise ValueError(f"Subscription not found: {data.get('subscription_id')}")
-
     user = await db.get(User, sub.user_id)
     if not user:
         raise ValueError(f"User {sub.user_id} not found during expiry")
-
     user.tier = UserTier.FREE
-    sub.status = SubscriptionStatus.EXPIRED
-    sub.ended_at = datetime.now(timezone.utc)
-    sub.updated_at = datetime.now(timezone.utc)
-
     db.add(user)
-    db.add(sub)
-    event_log.subscription_id = sub.id
-    event_log.user_id = sub.user_id
-
+    await _patch_sub(sub, db, status=SubscriptionStatus.EXPIRED, ended_at=datetime.now(timezone.utc))
+    await reset_ai_credits(db, user, UserTier.FREE)
+    ev.subscription_id = sub.id
+    ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] {user.email} downgraded to free — subscription expired")
 
 
-async def _on_subscription_plan_changed(data: dict, db: AsyncSession, event_log: WebhookEvent) -> None:
-    """Upgrade or downgrade — update plan, billing period, and user tier atomically."""
-    sub = await _get_subscription(data.get("subscription_id", ""), db)
+async def _on_sub_plan_changed(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    sub = await _get_sub(data.get("subscription_id", ""), db)
     if not sub:
         raise ValueError(f"Subscription not found: {data.get('subscription_id')}")
-
     user = await db.get(User, sub.user_id)
     if not user:
         raise ValueError(f"User {sub.user_id} not found during plan change")
@@ -441,89 +299,118 @@ async def _on_subscription_plan_changed(data: dict, db: AsyncSession, event_log:
     new_product_id = data.get("product_id", "")
     plan, billing_period = PRODUCT_MAP.get(new_product_id) or (sub.plan, sub.billing_period)
     if not PRODUCT_MAP.get(new_product_id):
-        logger.warning(f"[WEBHOOK] Unknown product_id '{new_product_id}' on plan change — keeping existing plan")
+        logger.warning(f"[WEBHOOK] Unknown product_id '{new_product_id}' on plan change — keeping existing")
 
-    sub.plan = plan
-    sub.billing_period = billing_period
-    sub.dodo_product_id = new_product_id
-    sub.status = SubscriptionStatus.ACTIVE
-    sub.current_period_start = _parse_dt(data.get("current_billing_period_start"))
-    sub.current_period_end = _parse_dt(data.get("current_billing_period_end"))
-    sub.updated_at = datetime.now(timezone.utc)
-
-    user.tier = PLAN_TO_TIER.get(plan, UserTier.FREE)
-
-    db.add(sub)
+    new_tier = PLAN_TO_TIER.get(plan, UserTier.FREE)
+    user.tier = new_tier
     db.add(user)
-    event_log.subscription_id = sub.id
-    event_log.user_id = sub.user_id
-
+    await _patch_sub(sub, db,
+        plan=plan,
+        billing_period=billing_period,
+        dodo_product_id=new_product_id,
+        status=SubscriptionStatus.ACTIVE,
+        current_period_start=datetime.now(timezone.utc),
+        current_period_end=_parse_dt(data.get("next_billing_date")),
+    )
+    await reset_ai_credits(db, user, new_tier)
+    ev.subscription_id = sub.id
+    ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] {user.email} plan changed to {plan} ({billing_period})")
 
 
-# ── Payment Handlers ─────────────────────────────────────────────────────────
+# ── Cancel Subscription ───────────────────────────────────────────────────────
 
-async def _on_payment_succeeded(data: dict, db: AsyncSession, event_log: WebhookEvent) -> None:
-    await _upsert_invoice(data, PaymentStatus.SUCCEEDED, db, event_log)
+async def cancel_subscription(user: User, db: AsyncSession) -> None:
+    result = await db.execute(select(Subscription).where(Subscription.user_id == user.id))
+    sub = result.scalars().first()
+    if not sub:
+        raise ValueError("No active subscription found.")
+    if sub.cancel_at_period_end:
+        raise ValueError("Subscription is already scheduled for cancellation.")
 
-
-async def _on_payment_failed(data: dict, db: AsyncSession, event_log: WebhookEvent) -> None:
-    await _upsert_invoice(data, PaymentStatus.FAILED, db, event_log)
-
-
-async def _on_refund_succeeded(data: dict, db: AsyncSession, event_log: WebhookEvent) -> None:
-    """Mark an existing invoice as refunded."""
-    payment_id = data.get("payment_id") or data.get("id", "")
-    result = await db.exec(
-        select(Invoice).where(Invoice.dodo_payment_id == payment_id)
+    await dodo_client.get().subscriptions.update(
+        sub.dodo_subscription_id,
+        cancel_at_next_billing_date=True,
+        cancel_reason="cancelled_by_customer",  # type: ignore[arg-type]
     )
-    invoice = result.first()
-    if invoice:
-        invoice.status = PaymentStatus.REFUNDED
-        db.add(invoice)
-        event_log.user_id = invoice.user_id
-        event_log.subscription_id = invoice.subscription_id
-        logger.info(f"[WEBHOOK] Invoice {invoice.id} marked as refunded")
+    logger.info(f"[BILLING] Cancel scheduled for user {user.id} sub {sub.dodo_subscription_id}")
 
 
-async def _upsert_invoice(
-    data: dict,
-    status: PaymentStatus,
-    db: AsyncSession,
-    event_log: WebhookEvent,
-) -> None:
-    """Creates an invoice row from a payment event. Skips duplicates."""
+# ── Reactivate Subscription ───────────────────────────────────────────────────
+
+async def reactivate_subscription(user: User, db: AsyncSession) -> None:
+    result = await db.execute(select(Subscription).where(Subscription.user_id == user.id))
+    sub = result.scalars().first()
+    if not sub:
+        raise ValueError("No subscription found.")
+    if not sub.cancel_at_period_end:
+        raise ValueError("Subscription is not scheduled for cancellation.")
+
+    await dodo_client.get().subscriptions.update(
+        sub.dodo_subscription_id,
+        cancel_at_next_billing_date=False,
+    )
+    logger.info(f"[BILLING] Reactivation requested for user {user.id} sub {sub.dodo_subscription_id}")
+
+
+# ── Payment Handlers ──────────────────────────────────────────────────────────
+
+async def _on_payment(data: dict, db: AsyncSession, ev: WebhookEvent, status: PaymentStatus) -> None:
     payment_id = data.get("payment_id") or data.get("id", "")
 
-    existing = await db.exec(
-        select(Invoice).where(Invoice.dodo_payment_id == payment_id)
-    )
-    if existing.first():
+    existing = await db.execute(select(Invoice).where(Invoice.dodo_payment_id == payment_id))
+    if existing.scalars().first():
         return
 
     sub_id = data.get("subscription_id", "")
-    sub = await _get_subscription(sub_id, db) if sub_id else None
-    user = await db.get(User, sub.user_id) if sub else None
+    sub = await _get_sub(sub_id, db) if sub_id else None
+    user = await db.get(User, sub.user_id) if sub else await _get_user(data, db)
 
-    if not sub or not user:
-        logger.warning(f"[WEBHOOK] Could not link invoice — payment_id={payment_id}")
+    if not user:
+        logger.warning(f"[WEBHOOK] No user found for invoice — payment_id={payment_id}")
         return
 
-    invoice = Invoice(
+    db.add(Invoice(
         user_id=user.id,
-        subscription_id=sub.id,
+        subscription_id=sub.id if sub else None,
         dodo_payment_id=payment_id,
-        amount=data["amount"] if data.get("amount") is not None else data.get("total_amount", 0),
+        amount=data.get("amount") if data.get("amount") is not None else data.get("total_amount", 0),
         currency=data.get("currency", "USD").upper(),
         status=status,
-        plan=sub.plan,
-        billing_period=sub.billing_period,
-        period_start=_parse_dt(data.get("current_billing_period_start")),
-        period_end=_parse_dt(data.get("current_billing_period_end")),
-    )
+        plan=sub.plan if sub else data.get("product_id", "unknown"),
+        billing_period=sub.billing_period if sub else "one-time",
+        period_start=None,
+        period_end=None,
+        invoice_url=data.get("invoice_url") or data.get("pdf_url"),
+    ))
+    ev.user_id = user.id
+    ev.subscription_id = sub.id if sub else None
+    logger.info(f"[WEBHOOK] Invoice {status.value} — {data.get('total_amount', 0)} {data.get('currency', 'USD')} for {user.email}")
 
-    db.add(invoice)
-    event_log.user_id = user.id
-    event_log.subscription_id = sub.id
 
-    logger.info(f"[WEBHOOK] Invoice created — {invoice.amount} {invoice.currency} {status.value} for {user.email}")
+async def _on_refund(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    payment_id = data.get("payment_id") or data.get("id", "")
+    result = await db.execute(select(Invoice).where(Invoice.dodo_payment_id == payment_id))
+    invoice = result.scalars().first()
+    if not invoice:
+        return
+    await db.execute(update(Invoice).where(Invoice.id == invoice.id).values(status=PaymentStatus.REFUNDED))
+    ev.user_id = invoice.user_id
+    ev.subscription_id = invoice.subscription_id
+    logger.info(f"[WEBHOOK] Invoice {invoice.id} refunded")
+
+
+# ── Handler Registry ──────────────────────────────────────────────────────────
+
+_HANDLERS = {
+    "subscription.active":       _on_sub_active,
+    "subscription.updated":      _on_sub_updated,
+    "subscription.renewed":      _on_sub_renewed,
+    "subscription.cancelled":    _on_sub_cancelled,
+    "subscription.on_hold":      _on_sub_on_hold,
+    "subscription.expired":      _on_sub_expired,
+    "subscription.plan_changed": _on_sub_plan_changed,
+    "payment.succeeded": lambda d, db, ev: _on_payment(d, db, ev, PaymentStatus.SUCCEEDED),
+    "payment.failed":    lambda d, db, ev: _on_payment(d, db, ev, PaymentStatus.FAILED),
+    "refund.succeeded":  _on_refund,
+}

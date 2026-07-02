@@ -45,7 +45,6 @@ export function ContactFormSection() {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    console.log("Form submitted:", formData);
   };
 
   const handleChange = (

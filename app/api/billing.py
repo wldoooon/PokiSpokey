@@ -1,21 +1,20 @@
-import json
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
-
+from sqlalchemy import select, desc
 from .deps import get_current_user, get_session
 from ..models.user import User
-from ..core.config import get_settings
+from ..models.subscription import Subscription
+from ..models.invoice import Invoice
 from ..core.logging import logger
+from ..core.dodo import dodo_client
 from ..services.billing import (
     create_checkout_url,
-    get_portal_url,
-    verify_webhook_signature,
     handle_webhook,
+    cancel_subscription,
+    reactivate_subscription,
 )
-
-settings = get_settings()
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
 
@@ -25,6 +24,10 @@ router = APIRouter(prefix="/billing", tags=["Billing"])
 class CheckoutRequest(BaseModel):
     plan: str            # "basic" | "pro" | "max"
     billing_period: str  # "monthly" | "yearly"
+
+
+class CancelRequest(BaseModel):
+    reason: str | None = None  # optional churn reason from UI
 
 
 # ── Checkout ─────────────────────────────────────────────────────────────────
@@ -53,24 +56,129 @@ async def checkout(
         raise HTTPException(status_code=502, detail="Failed to create checkout session.")
 
 
-# ── Customer Portal ──────────────────────────────────────────────────────────
 
-@router.get("/portal")
-async def portal(
+# ── Subscription ─────────────────────────────────────────────────────────────
+
+@router.get("/subscription")
+async def get_subscription(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
 ):
-    """
-    Returns a Dodo customer portal URL where the user can self-serve:
-    cancel, update card, download invoices — without you building any of that.
-    """
+    result = await db.execute(
+        select(Subscription).where(Subscription.user_id == current_user.id)
+    )
+    sub = result.scalars().first()
+    if not sub:
+        return {"subscription": None}
+    return {
+        "subscription": {
+            "status": sub.status,
+            "plan": sub.plan,
+            "billing_period": sub.billing_period,
+            "current_period_end": sub.current_period_end.isoformat() if sub.current_period_end else None,
+            "cancel_at_period_end": sub.cancel_at_period_end,
+            "canceled_at": sub.canceled_at.isoformat() if sub.canceled_at else None,
+        }
+    }
+
+
+# ── Invoices ─────────────────────────────────────────────────────────────────
+
+@router.get("/invoices")
+async def get_invoices(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    result = await db.execute(
+        select(Invoice)
+        .where(Invoice.user_id == current_user.id)
+        .order_by(desc(Invoice.created_at))
+        .limit(24)
+    )
+    invoices = result.scalars().all()
+    return {
+        "invoices": [
+            {
+                "id": str(inv.id),
+                "dodo_payment_id": inv.dodo_payment_id,
+                "date": inv.created_at.isoformat(),
+                "description": f"{inv.plan.capitalize()} · {inv.billing_period.capitalize()}",
+                "amount": inv.amount,
+                "currency": inv.currency,
+                "status": inv.status,
+                "invoice_url": inv.invoice_url,
+            }
+            for inv in invoices
+        ]
+    }
+
+
+# ── Cancel Subscription ──────────────────────────────────────────────────────
+
+@router.post("/cancel")
+async def cancel(
+    body: CancelRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
     try:
-        url = await get_portal_url(user=current_user)
-        return {"portal_url": url}
+        await cancel_subscription(user=current_user, db=db)
+        return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"[BILLING] Portal URL failed: {e}")
-        raise HTTPException(status_code=502, detail="Failed to get portal URL.")
+        logger.error(f"[BILLING] Cancel failed for user {current_user.id}: {e}")
+        raise HTTPException(status_code=502, detail="Failed to cancel subscription.")
+
+
+# ── Payment Methods ───────────────────────────────────────────────────────────
+
+@router.get("/payment-methods")
+async def get_payment_methods(
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.dodo_customer_id:
+        return {"payment_methods": []}
+    try:
+        resp = await dodo_client.get().customers.retrieve_payment_methods(
+            current_user.dodo_customer_id
+        )
+        methods = []
+        for item in (resp.items or []):
+            if item.payment_method != "card" or not item.card:
+                continue
+            methods.append({
+                "payment_method_id": item.payment_method_id,
+                "card_holder_name": item.card.card_holder_name,
+                "card_network": (item.card.card_network or "").lower(),
+                "card_type": (item.card.card_type or "").lower(),
+                "expiry_month": item.card.expiry_month,
+                "expiry_year": item.card.expiry_year,
+                "last4": item.card.last4_digits,
+                "recurring_enabled": item.recurring_enabled,
+                "last_used_at": item.last_used_at.isoformat() if item.last_used_at else None,
+            })
+        return {"payment_methods": methods}
+    except Exception as e:
+        logger.error(f"[BILLING] Failed to fetch payment methods for user {current_user.id}: {e}")
+        raise HTTPException(status_code=502, detail="Failed to fetch payment methods.")
+
+
+# ── Reactivate Subscription ──────────────────────────────────────────────────
+
+@router.post("/reactivate")
+async def reactivate(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    try:
+        await reactivate_subscription(user=current_user, db=db)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[BILLING] Reactivate failed for user {current_user.id}: {e}")
+        raise HTTPException(status_code=502, detail="Failed to reactivate subscription.")
 
 
 # ── Webhook ──────────────────────────────────────────────────────────────────
@@ -83,51 +191,35 @@ async def dodo_webhook(
     webhook_timestamp: str = Header(..., alias="webhook-timestamp"),
     webhook_signature: str = Header(..., alias="webhook-signature"),
 ):
-    """
-    Receives all events from Dodo (subscription, payment, refund, dispute, etc.)
-
-    Security — we do three things before trusting the payload:
-      1. Read the RAW bytes (before JSON parsing — bytes must match the signature)
-      2. Verify HMAC-SHA256 signature using our webhook secret
-      3. Check idempotency — skip if event_id already processed
-
-    We always return HTTP 200 once we've received and logged the event.
-    Returning 4xx would cause Dodo to retry — only do that for signature failures.
-    """
-    # 1. Read raw body BEFORE parsing — signature is computed on exact bytes
     raw_body = await request.body()
 
-    # 2. Verify signature — reject anything that didn't come from Dodo
-    if not verify_webhook_signature(
-        raw_body=raw_body,
-        webhook_id=webhook_id,
-        webhook_timestamp=webhook_timestamp,
-        webhook_signature=webhook_signature,
-    ):
-        logger.warning(f"[WEBHOOK] Signature verification failed — id={webhook_id}")
+    try:
+        dodo_client.get().webhooks.unwrap(
+            raw_body,
+            headers={
+                "webhook-id": webhook_id,
+                "webhook-signature": webhook_signature,
+                "webhook-timestamp": webhook_timestamp,
+            },
+        )
+    except Exception as e:
+        logger.warning(f"[WEBHOOK] Signature verification failed — id={webhook_id}: {e}")
         raise HTTPException(status_code=401, detail="Invalid webhook signature.")
 
-    # 3. Parse JSON after verification
-    try:
-        payload = json.loads(raw_body)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON body.")
-
-    event_id = payload.get("event_id") or webhook_id
-    event_type = payload.get("event_type", "unknown")
+    import json
+    payload_dict = json.loads(raw_body)
+    event_type = payload_dict.get("type", "unknown")
+    data = payload_dict.get("data", {})
 
     try:
         await handle_webhook(
-            event_id=event_id,
+            event_id=webhook_id,
             event_type=event_type,
-            payload=payload,
+            data=data,
             raw_body=raw_body.decode("utf-8"),
             db=db,
         )
     except Exception as e:
-        # Log but return 200 — we already stored the event with processed=False
-        # Returning 500 would make Dodo retry and we'd get the duplicate protection hit,
-        # but cleaner to return 200 and replay manually from webhook_events table.
         logger.error(f"[WEBHOOK] Handler error for {event_type}: {e}")
 
     return JSONResponse({"received": True})

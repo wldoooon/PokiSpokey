@@ -144,7 +144,6 @@ function TreeItemLabel<T = any>({
   const item = propItem || currentItem
 
   if (!item) {
-    console.warn("TreeItemLabel: No item provided via props or context")
     return null
   }
 
@@ -173,9 +172,6 @@ function TreeDragLine({
   const { tree } = useTreeContext()
 
   if (!tree || typeof tree.getDragLineStyle !== "function") {
-    console.warn(
-      "TreeDragLine: No tree provided via context or tree does not have getDragLineStyle method"
-    )
     return null
   }
 

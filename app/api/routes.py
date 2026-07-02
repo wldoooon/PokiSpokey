@@ -4,13 +4,14 @@ from pydantic import BaseModel
 from typing import Optional, List
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from .deps import get_search_service, get_current_user_optional, get_groq_service, get_session
+from ..services.usage_service import check_ai_credits, deduct_ai_credits, get_user_usage_stats, get_anonymous_usage_stats
+from .deps import get_search_service, get_current_user_optional, get_current_user, get_groq_service, get_session
 from ..services.search_service import SearchService
 from ..services.groq_service import GroqService
-from ..services.usage_service import check_ai_credits, deduct_ai_credits
 from ..services.translation_service import TranslationService, get_translation_service
 from ..schemas.search import SearchHit, SearchResponse, TranscriptSentence, TranscriptResponse, Word, Category, TranslateRequest, TranslateResponse
 from ..core.limiter import feature_rate_limit
+from ..core.limiter.core import TieredRateLimiter
 from ..core.logging import logger
 from ..models.user import User
 
@@ -18,6 +19,21 @@ router = APIRouter(
     prefix="/api/v1",
     tags=["Search"]
 )
+
+
+@router.get("/usage")
+async def get_usage(
+    request: Request,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_session),
+):
+    """Return current usage stats. Works for both authenticated users and guests."""
+    from ..core.redis import get_redis
+    redis = await get_redis()
+    if current_user is None:
+        client_ip = TieredRateLimiter.get_client_ip(request)
+        return await get_anonymous_usage_stats(redis=redis, client_ip=client_ip)
+    return await get_user_usage_stats(redis=redis, db=db, user=current_user)
 
 class CompletionRequest(BaseModel):
     prompt: str

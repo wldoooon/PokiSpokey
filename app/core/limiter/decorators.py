@@ -209,6 +209,23 @@ def feature_rate_limit(feature: str):
                         should_increment = False
                         logger.debug(f"[RATE-LIMIT] pagination page={page} — skipping increment")
 
+                    # Fix C: don't charge for zero-result searches (misspellings, dead-end queries).
+                    # We check len(result.hits) — NOT result.total.
+                    # result.total comes from Manticore's raw index count and can be >0
+                    # even when the returned hits list is empty (e.g. all results filtered
+                    # by dedup). result.hits is the actual list the user receives.
+                    if should_increment:
+                        try:
+                            hits_list = getattr(result, "hits", None) or []
+                            if len(hits_list) == 0:
+                                should_increment = False
+                                logger.debug(
+                                    f"[RATE-LIMIT] empty hits for q={request.query_params.get('q', '')} "
+                                    f"(total={getattr(result, 'total', '?')}) — skipping increment"
+                                )
+                        except Exception:
+                            pass
+
                     # Fix B: per-user dedup on page=1
                     if should_increment:
                         q_param      = request.query_params.get("q", "")
@@ -242,16 +259,18 @@ def feature_rate_limit(feature: str):
                 # 4. Inject headers into response if available
                 # Note: This requires the endpoint to accept a 'response' parameter
                 if response:
+                    # Use the real post-increment count: only add 1 if we actually incremented.
+                    # Previously always used current+1 which caused the meter to show -1 remaining
+                    # even for zero-result (uncharged) searches, correcting only on refresh.
+                    effective_used = current + 1 if should_increment else current
                     response.headers["RateLimit-Limit"] = str(limit)
-                    response.headers["RateLimit-Remaining"] = str(max(0, limit - (current + 1)))
-                    # Daily reset (approximate for now, can be improved)
+                    response.headers["RateLimit-Remaining"] = str(max(0, limit - effective_used))
                     response.headers["RateLimit-Reset"] = "86400"
-                    # Include policy name
                     response.headers["RateLimit-Policy"] = f"{feature};q={limit}"
                     logger.debug(
                         f"[RATE-LIMIT] HEADERS INJECTED feature={feature} | "
-                        f"limit={limit} | remaining={max(0, limit - (current + 1))} | "
-                        f"policy={feature};q={limit}"
+                        f"limit={limit} | remaining={max(0, limit - effective_used)} | "
+                        f"incremented={should_increment} | policy={feature};q={limit}"
                     )
                 else:
                     logger.warning(

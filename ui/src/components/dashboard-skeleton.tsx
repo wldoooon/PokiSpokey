@@ -18,6 +18,8 @@ import { LogoCloud } from "@/components/logo-cloud";
 import { FaqBoxComponent } from "@/components/faq-box-component";
 import { ContactUs } from "@/components/contact-us";
 import { AsciiBackground } from "@/components/ui/ascii-background";
+import { startTour } from "@/components/app-tour";
+import { OnboardingDialog } from "@/components/onboarding-dialog";
 
 const carouselItems = [
 	{
@@ -42,13 +44,18 @@ import { motion } from "motion/react";
 export function DashboardSkeleton() {
 	const { resolvedTheme } = useTheme();
 	const [mounted, setMounted] = useState(false);
+	const [showTourHint, setShowTourHint] = useState(false);
 
 	useEffect(() => {
 		setMounted(true);
+		if (!localStorage.getItem("vl_tour_done")) {
+			setShowTourHint(true);
+		}
 	}, []);
 
 	return (
 		<>
+			<OnboardingDialog />
 			<div
 				className={cn(
 					"grid grid-cols-2 lg:grid-cols-4 gap-0",
@@ -262,6 +269,14 @@ export function DashboardSkeleton() {
 						<p className="text-sm sm:text-base md:text-lg text-foreground/80 font-medium max-w-2xl mx-auto leading-relaxed mt-2">
 							The acoustic infrastructure layer that helps you listen,<br className="hidden md:block" /> practice, and perfect pronunciation from the live web.
 						</p>
+						{showTourHint && (
+							<button
+								onClick={() => { setShowTourHint(false); startTour(); }}
+								className="mt-5 text-xs text-muted-foreground/60 hover:text-foreground transition-colors underline underline-offset-4 decoration-dotted"
+							>
+								How it works →
+							</button>
+						)}
 					</div>
 				</div>
 

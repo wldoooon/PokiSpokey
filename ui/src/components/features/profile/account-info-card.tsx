@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "motion/react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -13,8 +14,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Lock, LogOut, Mail, ShieldCheck, CalendarDays,
   Eye, EyeOff, KeyRound, Camera, Languages, ChevronDown, Info,
-  Zap, Search, Check, ArrowUpRight, TriangleAlert, Link2, Unlink,
+  Zap, Search, Check, ArrowUpRight, TriangleAlert, Link2, Unlink, Loader2, Download, Clock, ChevronsUpDown, Upload,
+  CircleCheck, CircleX, RotateCcw, Ban, CircleAlert,
 } from "lucide-react"
+import {
+  Table, TableHeader, TableBody, TableHead, TableRow, TableCell,
+} from "@/components/ui/table"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Command, CommandEmpty, CommandGroup,
@@ -27,7 +32,14 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
+import { useUsageStore } from "@/stores/usage-store"
 import { useLogoutMutation, useUpdateProfileMutation } from "@/lib/authHooks"
+import { useSubscriptionQuery, useInvoicesQuery, getPlanPrice } from "@/lib/billingHooks"
+import type { SubscriptionInfo, InvoiceRow } from "@/lib/billingHooks"
+import { useQueryClient } from "@tanstack/react-query"
+import { apiClient } from "@/lib/apiClient"
+import { toastManager } from "@/components/ui/toast"
+import { PaymentCards } from "./payment-cards"
 
 // ── Mock data ────────────────────────────────────────────────────────────────
 const MOCK_USER = {
@@ -39,25 +51,52 @@ const MOCK_USER = {
   is_email_verified: true,
   created_at: "2024-03-15T10:00:00Z",
   usage: {
-    sparks:   { current: 3_200_000, limit: 5_000_000 },
-    searches: { current: 1_430,     limit: 2_000 },
+    sparks: { current: 3_200_000, limit: 5_000_000 },
+    searches: { current: 1_430, limit: 2_000 },
   },
 }
 
 const PLANS = [
-  { id: "free",    label: "Free",    price: "$0",     sparks: "50K",   searches: "100" },
-  { id: "basic",   label: "Basic",   price: "$4.99",  sparks: "800K",  searches: "500" },
-  { id: "pro",     label: "Pro",     price: "$8.99",  sparks: "5M",    searches: "2K",  popular: true },
-  { id: "premium", label: "Premium", price: "$14.99", sparks: "15M",   searches: "Unlimited" },
-  { id: "max",     label: "Max",     price: "$18.99", sparks: "∞",     searches: "Unlimited" },
+  { id: "free", label: "Free", price: "$0", sparks: "15K", searches: "50" },
+  { id: "basic", label: "Basic", price: "$7", sparks: "800K", searches: "300" },
+  { id: "pro", label: "Pro", price: "$12", sparks: "5M", searches: "Unlimited", popular: true },
+  { id: "max", label: "Max", price: "$20", sparks: "15M", searches: "Unlimited" },
 ]
 
-const TIER_CONFIG: Record<string, { label: string; className: string }> = {
-  free:    { label: "Free",    className: "bg-muted text-muted-foreground border-border" },
-  basic:   { label: "Basic",   className: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
-  pro:     { label: "Pro",     className: "bg-muted text-muted-foreground border-border" },
-  premium: { label: "Premium", className: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
-  max:     { label: "Max",     className: "bg-amber-500/10 text-amber-500 border-amber-500/20" },
+const TIER_CONFIG: Record<string, { label: string; className: string; style?: React.CSSProperties }> = {
+  free:  { label: "Free",  className: "bg-muted text-muted-foreground border-border" },
+  basic: { label: "Basic", className: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  pro: {
+    label: "Pro", className: "",
+    style: {
+      backgroundImage: [
+        "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.75) 50%, transparent 70%)",
+        "linear-gradient(105deg, #7A5C00 0%, #C9A020 30%, #FFD700 50%, #C9A020 70%, #7A5C00 100%)",
+      ].join(", "),
+      backgroundSize: "250% 100%, 100% 100%",
+      backgroundRepeat: "no-repeat, no-repeat",
+      animation: "gold-shimmer 3s ease-in-out infinite",
+      color: "#3D2400",
+      border: "1px solid #B8860B",
+      textShadow: "0 1px 1px rgba(255,255,255,0.4)",
+    },
+  },
+  max: {
+    label: "Max", className: "",
+    style: {
+      backgroundImage: [
+        "linear-gradient(105deg, transparent 25%, rgba(255,255,255,0.9) 50%, transparent 75%)",
+        "linear-gradient(105deg, #5C4200 0%, #B8860B 25%, #FFD700 45%, #FFF5A0 55%, #FFD700 65%, #B8860B 80%, #5C4200 100%)",
+      ].join(", "),
+      backgroundSize: "250% 100%, 100% 100%",
+      backgroundRepeat: "no-repeat, no-repeat",
+      animation: "gold-shimmer 2s ease-in-out infinite",
+      color: "#2A1A00",
+      border: "1px solid #92710D",
+      textShadow: "0 1px 2px rgba(255,255,255,0.5)",
+      boxShadow: "0 0 8px rgba(255,215,0,0.4), 0 0 2px rgba(255,215,0,0.6)",
+    },
+  },
 }
 
 const LANGUAGES = [
@@ -79,10 +118,10 @@ const LANGUAGES = [
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
     </svg>
   )
 }
@@ -316,13 +355,13 @@ function DeleteAccountDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 function AccountTab({ user }: { user: typeof MOCK_USER }) {
   const isOAuth = !!user.oauth_provider
 
-  const [displayName, setDisplayName]     = useState(user.full_name ?? "")
+  const [displayName, setDisplayName] = useState(user.full_name ?? "")
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [sizeError, setSizeError]         = useState(false)
-  const [nativeLang, setNativeLang]       = useState("ar")
-  const [learningLang, setLearningLang]   = useState("en")
-  const [deleteOpen, setDeleteOpen]       = useState(false)
-  const fileInputRef                      = useRef<HTMLInputElement>(null)
+  const [sizeError, setSizeError] = useState(false)
+  const [nativeLang, setNativeLang] = useState("ar")
+  const [learningLang, setLearningLang] = useState("en")
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const isDirty = displayName !== (user.full_name ?? "")
   const tier = TIER_CONFIG[user.tier] ?? TIER_CONFIG.free
   const updateMutation = useUpdateProfileMutation()
@@ -371,6 +410,7 @@ function AccountTab({ user }: { user: typeof MOCK_USER }) {
             <Badge
               variant="outline"
               className={cn("mt-2 text-[11px] font-semibold px-2.5 py-0.5 rounded-full", tier.className)}
+              style={tier.style}
             >
               {tier.label}
             </Badge>
@@ -468,9 +508,11 @@ function AccountTab({ user }: { user: typeof MOCK_USER }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { icon: CalendarDays, label: "Member since", value: formatDate(user.created_at) },
-          { icon: Mail,         label: "Sign-in method", value: user.oauth_provider ?? "Email / Password" },
-          { icon: ShieldCheck,  label: "Email", value: user.is_email_verified ? "Verified" : "Unverified",
-            badge: true, ok: user.is_email_verified },
+          { icon: Mail, label: "Sign-in method", value: user.oauth_provider ?? "Email / Password" },
+          {
+            icon: ShieldCheck, label: "Email", value: user.is_email_verified ? "Verified" : "Unverified",
+            badge: true, ok: user.is_email_verified
+          },
         ].map(({ icon: Icon, label, value, badge, ok }) => (
           <div key={label} className="rounded-2xl bg-muted/30 border border-border/40 px-4 py-3.5 space-y-1">
             <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -481,7 +523,7 @@ function AccountTab({ user }: { user: typeof MOCK_USER }) {
               <Badge variant="outline" className={cn(
                 "text-[10px] font-semibold px-2 py-0 rounded-full mt-1",
                 ok ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                   : "bg-red-500/10 text-red-500 border-red-500/20"
+                  : "bg-red-500/10 text-red-500 border-red-500/20"
               )}>
                 {value}
               </Badge>
@@ -530,12 +572,12 @@ function AccountTab({ user }: { user: typeof MOCK_USER }) {
         <div className="space-y-2">
           {[
             {
-              id:          "google",
-              name:        "Google",
+              id: "google",
+              name: "Google",
               description: "Sign in with your Google account",
-              icon:        <GoogleIcon className="h-5 w-5" />,
-              linked:      user.oauth_provider === "google",
-              canUnlink:   user.oauth_provider === "google",
+              icon: <GoogleIcon className="h-5 w-5" />,
+              linked: user.oauth_provider === "google",
+              canUnlink: user.oauth_provider === "google",
             },
           ].map((provider) => (
             <motion.div
@@ -603,7 +645,7 @@ function AccountTab({ user }: { user: typeof MOCK_USER }) {
               You sign in with Google. If you lose access to your Google account you won't be able to log in.{" "}
               <button
                 type="button"
-                onClick={() => {/* TODO: navigate to security tab */}}
+                onClick={() => {/* TODO: navigate to security tab */ }}
                 className="underline underline-offset-2 text-foreground hover:text-primary transition-colors"
               >
                 Add a password
@@ -665,18 +707,18 @@ function AccountTab({ user }: { user: typeof MOCK_USER }) {
 function getPasswordStrength(pw: string): { score: number; label: string; barColor: string; textColor: string } {
   if (!pw) return { score: 0, label: "", barColor: "", textColor: "" }
   let score = 0
-  if (pw.length >= 8)  score++
+  if (pw.length >= 8) score++
   if (pw.length >= 12) score++
   if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++
-  if (/\d/.test(pw))   score++
+  if (/\d/.test(pw)) score++
   if (/[^A-Za-z0-9]/.test(pw)) score++
   const s = Math.min(4, score) as 0 | 1 | 2 | 3 | 4
   return [
-    { score: 0, label: "",       barColor: "",                textColor: "" },
-    { score: 1, label: "Weak",   barColor: "bg-red-500",      textColor: "text-red-500" },
-    { score: 2, label: "Fair",   barColor: "bg-amber-500",    textColor: "text-amber-500" },
-    { score: 3, label: "Good",   barColor: "bg-blue-500",     textColor: "text-blue-500" },
-    { score: 4, label: "Strong", barColor: "bg-emerald-500",  textColor: "text-emerald-500" },
+    { score: 0, label: "", barColor: "", textColor: "" },
+    { score: 1, label: "Weak", barColor: "bg-red-500", textColor: "text-red-500" },
+    { score: 2, label: "Fair", barColor: "bg-amber-500", textColor: "text-amber-500" },
+    { score: 3, label: "Good", barColor: "bg-blue-500", textColor: "text-blue-500" },
+    { score: 4, label: "Strong", barColor: "bg-emerald-500", textColor: "text-emerald-500" },
   ][s]
 }
 
@@ -712,14 +754,14 @@ function SecurityTab({ user }: { user: typeof MOCK_USER }) {
   const isOAuth = !!user.oauth_provider
 
   const [showCurrent, setShowCurrent] = useState(false)
-  const [showNew, setShowNew]         = useState(false)
+  const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [current, setCurrent]         = useState("")
-  const [next, setNext]               = useState("")
-  const [confirm, setConfirm]         = useState("")
-  const [newEmail, setNewEmail]       = useState("")
+  const [current, setCurrent] = useState("")
+  const [next, setNext] = useState("")
+  const [confirm, setConfirm] = useState("")
+  const [newEmail, setNewEmail] = useState("")
 
-  const strength      = getPasswordStrength(next)
+  const strength = getPasswordStrength(next)
   const passwordsMatch = confirm.length > 0 && next === confirm
   const passwordsMismatch = confirm.length > 0 && next !== confirm
   const canSubmitPassword = isOAuth
@@ -804,7 +846,7 @@ function SecurityTab({ user }: { user: typeof MOCK_USER }) {
                   placeholder="••••••••"
                   className={cn(
                     "rounded-xl h-11 pr-10 bg-muted/40 border-border/50 focus-visible:ring-primary/30",
-                    passwordsMatch    && "border-emerald-500/50 focus-visible:ring-emerald-500/30",
+                    passwordsMatch && "border-emerald-500/50 focus-visible:ring-emerald-500/30",
                     passwordsMismatch && "border-red-500/50 focus-visible:ring-red-500/30",
                   )}
                 />
@@ -893,29 +935,321 @@ function SecurityTab({ user }: { user: typeof MOCK_USER }) {
   )
 }
 
+function FilterDropdown({ label, value, options, onChange }: {
+  label: string
+  value: string
+  options: { label: string; value: string; badgeClassName?: string; icon?: React.ComponentType<{ className?: string }> }[]
+  onChange: (v: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const active = options.find(o => o.value === value)
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="flex items-center gap-1.5 text-xs border border-border/60 rounded-lg px-3 py-1.5 hover:bg-muted/50 transition-colors cursor-pointer">
+          <span className="text-muted-foreground">{label}:</span>
+          {active?.badgeClassName ? (
+            <span className={cn("inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full border text-[11px]", active.badgeClassName)}>
+              {active.icon && <active.icon className="w-3 h-3" />}
+              {active.label}
+            </span>
+          ) : (
+            <span className="font-semibold text-foreground">{active?.label ?? value}</span>
+          )}
+          <ChevronDown className="w-3 h-3 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="p-1 w-44 rounded-xl border-border/60 shadow-lg" align="start" sideOffset={6}>
+        {options.map((opt, idx) => (
+          <div key={opt.value}>
+            {idx > 0 && <div className="h-px bg-border/40 mx-1 my-0.5" />}
+            <button
+              onClick={() => { onChange(opt.value); setOpen(false) }}
+              className={cn(
+                "w-full text-left text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer flex items-center gap-2",
+                opt.value === value ? "bg-muted" : "hover:bg-muted/60"
+              )}
+            >
+              {opt.badgeClassName ? (
+                <span className={cn("inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full border text-[11px]", opt.badgeClassName)}>
+                  {opt.icon && <opt.icon className="w-3 h-3" />}
+                  {opt.label}
+                </span>
+              ) : (
+                <span className={cn("font-semibold", opt.value === value ? "text-foreground" : "text-muted-foreground")}>{opt.label}</span>
+              )}
+            </button>
+          </div>
+        ))}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function BillingTab({ user }: { user: typeof MOCK_USER }) {
-  const tier   = TIER_CONFIG[user.tier] ?? TIER_CONFIG.free
-  const sparks = user.usage.sparks
-  const searches = user.usage.searches
-  const currentPlan = PLANS.find(p => p.id === user.tier) ?? PLANS[0]
+  const usage = useUsageStore((s) => s.usage)
+
+  const queryClient = useQueryClient()
+  const { data: sub = null, isLoading: subLoading } = useSubscriptionQuery()
+  const { data: invoices = [], isLoading: invLoading } = useInvoicesQuery()
+
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelReasons, setCancelReasons] = useState<string[]>([])
+  const [cancelConfirm, setCancelConfirm] = useState("")
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [reactivateLoading, setReactivateLoading] = useState(false)
+  const [statusFilter, setStatusFilter] = useState("All")
+  const [dateFilter, setDateFilter] = useState("Any")
+  const [planFilter, setPlanFilter] = useState("Any")
+  const [amountFilter, setAmountFilter] = useState("Any")
+
+  const handleCheckout = async (planId: string) => {
+    setCheckoutLoading(planId)
+    try {
+      const { data } = await apiClient.post<{ checkout_url: string }>("/billing/checkout", {
+        plan: planId,
+        billing_period: "monthly",
+      })
+      window.location.href = data.checkout_url
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? "Could not start checkout."
+      toastManager.add({ title: "Checkout failed", description: msg, type: "error" })
+      setCheckoutLoading(null)
+    }
+  }
+
+  const renewalLabel = () => {
+    if (subLoading) return "Loading..."
+    if (!sub?.current_period_end) return null
+    const date = new Date(sub.current_period_end)
+    const formatted = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    if (sub.cancel_at_period_end) return `Cancels ${formatted}`
+    return `Renews ${formatted}`
+  }
+
+  const planOptions = ["Any", ...Array.from(new Set(invoices.map(inv => inv.description.split(" · ")[0]).filter(Boolean)))]
+
+  const filteredInvoices = invoices.filter(inv => {
+    if (statusFilter !== "All" && inv.status !== statusFilter) return false
+    if (dateFilter !== "Any") {
+      const days = dateFilter === "30d" ? 30 : dateFilter === "3m" ? 90 : dateFilter === "6m" ? 180 : 365
+      if (new Date(inv.date) < new Date(Date.now() - days * 86400000)) return false
+    }
+    if (planFilter !== "Any" && inv.description.split(" · ")[0] !== planFilter) return false
+    if (amountFilter !== "Any") {
+      const amt = inv.amount / 100
+      if (amountFilter === "under10" && amt >= 10) return false
+      if (amountFilter === "10-50" && (amt < 10 || amt > 50)) return false
+      if (amountFilter === "over50" && amt <= 50) return false
+    }
+    return true
+  })
+
+  const sparksBalance = usage.ai_chat?.balance ?? 0
+  const sparksLimit = usage.ai_chat?.limit ?? 0
+  const searchCurrent = usage.search?.current ?? 0
+  const searchLimit = usage.search?.limit ?? 0
+
+  const sparksUnlimited = sparksLimit === -1
+  const searchUnlimited = searchLimit === -1
+  const sparksUsed = sparksUnlimited ? 0 : Math.max(0, sparksLimit - sparksBalance)
+  const sparksRemaining = sparksUnlimited ? Infinity : sparksBalance
+
+  const activePlanId = sub?.plan ?? "free"
+  const currentPlan = PLANS.find(p => p.id === activePlanId) ?? PLANS[0]
 
   return (
     <div className="space-y-6">
-      {/* Current plan */}
-      <div className="rounded-2xl border border-border/50 bg-muted/20 px-5 py-4 flex items-center justify-between">
+      {/* Subscription details */}
+      <div className="rounded-2xl border border-border/50 p-5 space-y-4">
         <div>
-          <div className="flex items-center gap-2">
-            <p className="font-semibold text-foreground">{currentPlan.label} Plan</p>
-            <Badge variant="outline" className={cn("text-[10px] font-semibold px-2 py-0 rounded-full", tier.className)}>
-              Active
-            </Badge>
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">{currentPlan.price}/month · renews Dec 15, 2025</p>
+          <h3 className="text-base font-bold text-foreground">Subscription details</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">An overview of your plan, usage, and billing cycle.</p>
         </div>
-        <Button variant="outline" size="sm" className="rounded-xl gap-1.5">
-          Manage <ArrowUpRight className="h-3.5 w-3.5" />
-        </Button>
+        <Separator />
+        {subLoading ? (
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-28 rounded-lg" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+              <Skeleton className="h-4 w-40 rounded-lg" />
+            </div>
+            <Skeleton className="h-8 w-24 rounded-xl" />
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground mb-1">Price</p>
+              <p className="text-base font-semibold text-foreground">
+                {currentPlan.id !== "free" ? `${currentPlan.price}/mo` : "Free"}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground mb-1">Your plan</p>
+              <div className="flex items-center gap-2">
+                <p className="text-base font-semibold text-foreground">{currentPlan.label}</p>
+                <Badge variant="outline" className={cn(
+                  "text-[11px] font-semibold px-2.5 py-0.5 rounded-full self-center leading-none h-auto flex items-center gap-1",
+                  sub?.cancel_at_period_end
+                    ? "text-muted-foreground bg-muted border-border/60"
+                    : "text-white bg-blue-600 border-blue-600"
+                )}>
+                  {sub?.cancel_at_period_end && <Clock className="w-3 h-3 shrink-0" />}
+                  {sub?.cancel_at_period_end ? "Cancel pending" : "Active"}
+                </Badge>
+              </div>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground mb-1">Next invoice on</p>
+              <p className="text-base font-semibold text-foreground">
+                {sub?.current_period_end
+                  ? new Date(sub.current_period_end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                  : "—"}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground mb-1">Cycle</p>
+              <p className="text-base font-semibold text-foreground capitalize">{sub?.billing_period ?? "—"}</p>
+            </div>
+            {activePlanId !== "free" && !sub?.cancel_at_period_end && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="rounded-xl text-sm cursor-pointer hover:bg-red-700 transition-colors shrink-0"
+                onClick={() => setCancelOpen(true)}
+              >
+                Cancel Plan
+              </Button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Cancel subscription dialog */}
+      <Dialog open={cancelOpen} onOpenChange={(v) => { if (!v) { setCancelReasons([]); setCancelConfirm("") } setCancelOpen(v) }}>
+        <DialogContent className="rounded-2xl sm:max-w-[1100px] w-full p-0 overflow-hidden" showCloseButton={false}>
+          <div className="flex min-h-[600px]">
+            {/* Left — image */}
+            <div className="hidden md:block w-1/2 shrink-0 relative">
+              <img
+                src="/cancel-picture.jpg"
+                alt=""
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 right-[-6px] bg-gradient-to-l from-white to-transparent dark:from-background dark:to-transparent" />
+            </div>
+
+            {/* Right — content */}
+            <div className="flex-1 min-w-0 flex flex-col gap-5 p-6 pt-7">
+              <button
+                onClick={() => { setCancelReasons([]); setCancelConfirm(""); setCancelOpen(false) }}
+                className="absolute top-3.5 right-3.5 z-50 p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-bold">Cancel your subscription</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed">
+                  We're sorry to see you cancel your plan. To help us improve, we have a few short questions for you before you leave us.
+                </DialogDescription>
+              </div>
+
+              <div className="space-y-2.5">
+                <p className="text-sm font-semibold text-foreground">Why are you cancelling your plan?</p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    "Too expensive",
+                    "Not using it enough",
+                    "Missing features I need",
+                    "Switching to another service",
+                    "Too difficult to use",
+                  ].map(reason => {
+                    const checked = cancelReasons.includes(reason)
+                    return (
+                      <button
+                        key={reason}
+                        type="button"
+                        onClick={() => setCancelReasons(prev =>
+                          checked ? prev.filter(r => r !== reason) : [...prev, reason]
+                        )}
+                        className="flex items-center gap-3 cursor-pointer text-left"
+                      >
+                        <span className={cn(
+                          "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+                          checked ? "border-red-600 bg-red-600" : "border-border bg-transparent"
+                        )}>
+                          {checked && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </span>
+                        <span className="text-sm text-foreground">{reason}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="flex-1 flex flex-col min-h-0">
+                <textarea
+                  placeholder="What would have kept you? (optional)"
+                  className="h-full w-full resize-none rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-border transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium text-foreground">Type <span className="font-bold">CANCEL</span> to confirm.</p>
+                  <Input
+                    placeholder="CANCEL"
+                    value={cancelConfirm}
+                    onChange={e => setCancelConfirm(e.target.value)}
+                    className="rounded-xl"
+                  />
+                </div>
+                <Button
+                  variant="destructive"
+                  className="w-full rounded-xl h-10 cursor-pointer hover:bg-red-700 transition-colors"
+                  disabled={cancelLoading || cancelConfirm !== "CANCEL"}
+                  onClick={async () => {
+                    setCancelLoading(true)
+                    try {
+                      await apiClient.post("/billing/cancel", { reason: cancelReasons.length ? cancelReasons.join(", ") : null })
+                      queryClient.setQueryData<SubscriptionInfo>(["billing", "subscription"], prev => prev ? { ...prev, cancel_at_period_end: true } : prev)
+                      setCancelOpen(false)
+                      setCancelReasons([])
+                      setCancelConfirm("")
+                      toastManager.add({ title: "Subscription cancelled", description: "You'll keep full access until the end of your billing period.", type: "success" })
+                    } catch {
+                      toastManager.add({ title: "Cancellation failed", description: "Failed to cancel subscription. Please try again.", type: "error" })
+                    } finally {
+                      setCancelLoading(false)
+                    }
+                  }}
+                >
+                  {cancelLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel plan"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => { setCancelReasons([]); setCancelConfirm(""); setCancelOpen(false) }}
+                  disabled={cancelLoading}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-center"
+                >
+                  Never mind
+                </button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Separator />
+
+      {/* Payment methods */}
+      <PaymentCards />
+
+      <Separator />
 
       {/* Usage */}
       <div className="space-y-3">
@@ -924,16 +1258,22 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
           {[
             {
               icon: Zap, label: "AI Sparks",
-              used: sparks.current, limit: sparks.limit,
+              used: sparksUsed,
+              limit: sparksUnlimited ? 0 : sparksLimit,
+              remaining: sparksUnlimited ? -1 : sparksRemaining,
+              unlimited: sparksUnlimited,
               color: "bg-primary",
             },
             {
               icon: Search, label: "Searches",
-              used: searches.current, limit: searches.limit,
+              used: searchCurrent,
+              limit: searchUnlimited ? 0 : searchLimit,
+              remaining: searchUnlimited ? -1 : Math.max(0, searchLimit - searchCurrent),
+              unlimited: searchUnlimited,
               color: "bg-blue-500",
             },
-          ].map(({ icon: Icon, label, used, limit, color }) => {
-            const pct = Math.min(100, (used / limit) * 100)
+          ].map(({ icon: Icon, label, used, limit, remaining, unlimited, color }) => {
+            const pct = unlimited ? 0 : Math.min(100, limit > 0 ? (used / limit) * 100 : 0)
             return (
               <div key={label} className="rounded-2xl border border-border/40 bg-muted/20 px-4 py-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
@@ -942,11 +1282,13 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
                     {label}
                   </span>
                   <span className="text-xs text-muted-foreground tabular-nums">
-                    {formatNumber(used)} / {formatNumber(limit)}
+                    {unlimited ? "∞" : `${formatNumber(used)} / ${formatNumber(limit)}`}
                   </span>
                 </div>
-                <Progress value={pct} className={cn("h-1.5 rounded-full", pct > 80 ? "[&>div]:bg-red-500" : `[&>div]:${color}`)} />
-                <p className="text-[11px] text-muted-foreground">{formatNumber(limit - used)} remaining</p>
+                <Progress value={pct} className="h-1.5 rounded-full bg-muted [&>div]:bg-foreground" />
+                <p className="text-[11px] text-muted-foreground">
+                  {unlimited ? "Unlimited" : `${formatNumber(remaining)} remaining`}
+                </p>
               </div>
             )
           })}
@@ -955,83 +1297,222 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
 
       <Separator />
 
-      {/* Plan comparison */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Available Plans</h3>
-        <div className="space-y-2">
-          {PLANS.map((plan) => {
-            const isCurrent = plan.id === user.tier
-            return (
-              <div key={plan.id} className={cn(
-                "flex items-center justify-between rounded-2xl border px-4 py-3 transition-colors",
-                isCurrent
-                  ? "border-primary/30 bg-primary/5"
-                  : "border-border/40 bg-muted/10 hover:bg-muted/30"
-              )}>
-                <div className="flex items-center gap-3">
-                  {isCurrent
-                    ? <Check className="h-4 w-4 text-primary" />
-                    : <div className="h-4 w-4 rounded-full border border-border/50" />
-                  }
-                  <div>
-                    <p className={cn("text-sm font-semibold", isCurrent ? "text-primary" : "text-foreground")}>
-                      {plan.label}
-                      {plan.popular && !isCurrent && (
-                        <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">Popular</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{plan.sparks} Sparks · {plan.searches} searches</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-foreground">{plan.price}<span className="text-xs text-muted-foreground font-normal">/mo</span></span>
-                  {!isCurrent && (
-                    <Button variant="outline" size="sm" className="rounded-xl h-7 text-xs px-3">
-                      {PLANS.indexOf(plan) > PLANS.findIndex(p => p.id === user.tier) ? "Upgrade" : "Downgrade"}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+      {/* Cancellation banner */}
+      {sub?.cancel_at_period_end && sub?.current_period_end && (
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <TriangleAlert className="w-4 h-4 text-amber-500 shrink-0" />
+            <p className="text-sm text-foreground">
+              Your subscription cancels on{" "}
+              <span className="font-semibold">
+                {new Date(sub.current_period_end).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              </span>
+              . No further charges after that.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl text-xs shrink-0 cursor-pointer"
+            disabled={reactivateLoading}
+            onClick={async () => {
+              setReactivateLoading(true)
+              try {
+                await apiClient.post("/billing/reactivate")
+                queryClient.setQueryData<SubscriptionInfo>(["billing", "subscription"], prev => prev ? { ...prev, cancel_at_period_end: false } : prev)
+                toastManager.add({ title: "Subscription reactivated", description: "Your subscription will continue as normal.", type: "success" })
+              } catch {
+                toastManager.add({ title: "Reactivation failed", description: "Could not reactivate. Please try again.", type: "error" })
+              } finally {
+                setReactivateLoading(false)
+              }
+            }}
+          >
+            {reactivateLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reactivate"}
+          </Button>
         </div>
+      )}
+
+      {/* Invoice history */}
+      <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 space-y-4">
+        {/* Header */}
+        <div>
+          <h3 className="text-base font-bold text-foreground">Invoices</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">Your complete invoice history, including payment details.</p>
+        </div>
+
+        {/* Filter bar */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <FilterDropdown
+              label="Status" value={statusFilter}
+              options={[
+                { label: "All", value: "All" },
+                { label: "Paid",       value: "succeeded",  badgeClassName: "text-white bg-emerald-600 border-emerald-700", icon: CircleCheck },
+                { label: "Failed",     value: "failed",     badgeClassName: "text-white bg-red-600 border-red-700",         icon: CircleX },
+                { label: "Refunded",   value: "refunded",   badgeClassName: "text-white bg-amber-600 border-amber-700",     icon: RotateCcw },
+                { label: "Cancelled",  value: "cancelled",  badgeClassName: "text-white bg-slate-600 border-slate-700",     icon: Ban },
+                { label: "Processing", value: "processing", badgeClassName: "text-white bg-blue-600 border-blue-700",       icon: Loader2 },
+              ]}
+              onChange={setStatusFilter}
+            />
+            <FilterDropdown
+              label="Billing date" value={dateFilter}
+              options={[
+                { label: "Any", value: "Any" },
+                { label: "Last 30 days", value: "30d" },
+                { label: "Last 3 months", value: "3m" },
+                { label: "Last 6 months", value: "6m" },
+                { label: "Last year", value: "1y" },
+              ]}
+              onChange={setDateFilter}
+            />
+            <FilterDropdown
+              label="Plan" value={planFilter}
+              options={planOptions.map(p => ({ label: p, value: p }))}
+              onChange={setPlanFilter}
+            />
+          </div>
+        </div>
+
+        {invLoading ? (
+          <div className="rounded-xl border border-border/40 divide-y divide-border/30 overflow-hidden">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="flex items-center gap-6 px-4 py-4">
+                <Skeleton className="h-4 w-6 rounded" />
+                <Skeleton className="h-4 w-28 rounded" />
+                <Skeleton className="h-4 w-16 rounded" />
+                <Skeleton className="h-4 w-16 rounded" />
+                <Skeleton className="h-4 w-24 rounded" />
+                <Skeleton className="h-4 w-14 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : invoices.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">No invoices yet.</p>
+        ) : filteredInvoices.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">No invoices match the selected filters.</p>
+        ) : (
+          <div className="rounded-xl border border-border/40 overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent border-border/40">
+                <TableHead className="text-xs font-semibold text-muted-foreground py-3 w-10">№</TableHead>
+                {[["Invoice ID"], ["Plan"], ["Cycle"], ["Billing date"], ["Amount"]].map(([col]) => (
+                  <TableHead key={col} className="text-xs font-semibold text-muted-foreground py-3">
+                    <span className="flex items-center gap-1">{col} <ChevronsUpDown className="w-3 h-3 opacity-50" /></span>
+                  </TableHead>
+                ))}
+                <TableHead className="text-xs font-semibold text-muted-foreground py-3">Status</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground py-3 text-right">Invoice</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredInvoices.map((inv, idx) => {
+                const [plan, cycle] = inv.description.split(" · ")
+                const statusConfig: Record<string, { label: string; className: string; icon: React.ComponentType<{ className?: string }> }> = {
+                  succeeded:                { label: "Paid",          className: "text-white bg-emerald-600 border-emerald-700", icon: CircleCheck },
+                  failed:                   { label: "Failed",        className: "text-white bg-red-600 border-red-700",         icon: CircleX },
+                  refunded:                 { label: "Refunded",      className: "text-white bg-amber-600 border-amber-700",     icon: RotateCcw },
+                  cancelled:                { label: "Cancelled",     className: "text-white bg-slate-600 border-slate-700",     icon: Ban },
+                  processing:               { label: "Processing",    className: "text-white bg-blue-600 border-blue-700",       icon: Loader2 },
+                  requires_customer_action: { label: "Action needed", className: "text-white bg-orange-600 border-orange-700",  icon: CircleAlert },
+                  requires_payment_method:  { label: "Update card",   className: "text-white bg-orange-600 border-orange-700",  icon: CircleAlert },
+                }
+                const statusInfo = statusConfig[inv.status] ?? { label: inv.status, className: "text-muted-foreground bg-muted/40 border-border/40", icon: CircleAlert }
+                return (
+                  <TableRow key={inv.id} className="border-border/30 hover:bg-muted/20 transition-colors">
+                    <TableCell className="text-sm text-muted-foreground py-4">{filteredInvoices.length - idx}</TableCell>
+                    <TableCell className="text-sm font-mono text-foreground py-4 tracking-wide">
+                      {inv.dodo_payment_id ?? inv.id.slice(0, 12).toUpperCase()}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-foreground py-4">{plan ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-foreground py-4 capitalize">{cycle ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-foreground py-4">
+                      {new Date(inv.date).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium tabular-nums text-foreground py-4">
+                      {(getPlanPrice(inv.description) ?? 0).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <Badge variant="outline" className={cn("inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full", statusInfo.className)}>
+                        <statusInfo.icon className="w-3 h-3" />
+                        {statusInfo.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right py-4">
+                      {inv.invoice_url ? (
+                        <Button variant="ghost" size="sm" className="h-7 rounded-lg gap-1.5 text-xs px-2.5 cursor-pointer" asChild>
+                          <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer">
+                            <Download className="h-3 w-3" />
+                            Download
+                          </a>
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+          </div>
+        )}
       </div>
     </div>
   )
 }
+
 
 const TAB_ORDER = ["account", "security", "billing"]
 
 const slideVariants = {
   enter: (dir: number) => ({ x: dir > 0 ? 36 : -36, opacity: 0 }),
   center: { x: 0, opacity: 1 },
-  exit:  (dir: number) => ({ x: dir > 0 ? -36 : 36, opacity: 0 }),
+  exit: (dir: number) => ({ x: dir > 0 ? -36 : 36, opacity: 0 }),
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function AccountInfoCard() {
-  const authUser   = useAuthStore((s) => s.user)
+  const authUser = useAuthStore((s) => s.user)
   const authStatus = useAuthStore((s) => s.status)
-  const [activeTab, setActiveTab] = useState("account")
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = searchParams.get("tab")
+    return TAB_ORDER.includes(t ?? "") ? (t as string) : "account"
+  })
   const directionRef = useRef(0)
+
+  useEffect(() => {
+    const t = searchParams.get("tab")
+    if (t && TAB_ORDER.includes(t) && t !== activeTab) {
+      const prev = TAB_ORDER.indexOf(activeTab)
+      const next = TAB_ORDER.indexOf(t)
+      directionRef.current = next > prev ? 1 : -1
+      setActiveTab(t)
+    }
+  }, [searchParams])
 
   const handleTabChange = (value: string) => {
     const prev = TAB_ORDER.indexOf(activeTab)
     const next = TAB_ORDER.indexOf(value)
     directionRef.current = next > prev ? 1 : -1
     setActiveTab(value)
+    router.replace(`/profile?tab=${value}`, { scroll: false })
   }
 
   // Merge real auth data over mock defaults (billing/usage still mock until API ready)
   const user = {
     ...MOCK_USER,
-    full_name:        authUser?.full_name ?? MOCK_USER.full_name,
-    email:            authUser?.email     ?? MOCK_USER.email,
+    full_name: authUser?.full_name ?? MOCK_USER.full_name,
+    email: authUser?.email ?? MOCK_USER.email,
     oauth_avatar_url: authUser?.oauth_avatar_url ?? null,
-    oauth_provider:   authUser?.oauth_provider   ?? null,
-    tier:             (authUser?.tier ?? MOCK_USER.tier) as typeof MOCK_USER.tier,
+    oauth_provider: authUser?.oauth_provider ?? null,
+    tier: (authUser?.tier ?? MOCK_USER.tier) as typeof MOCK_USER.tier,
     is_email_verified: authUser?.is_email_verified ?? MOCK_USER.is_email_verified,
-    created_at:       authUser?.created_at ?? MOCK_USER.created_at,
+    created_at: authUser?.created_at ?? MOCK_USER.created_at,
   }
 
   if (authStatus === "unknown") return <AccountInfoCardSkeleton />
@@ -1042,69 +1523,79 @@ export function AccountInfoCard() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-    <div className="rounded-3xl border border-border/60 bg-card shadow-sm overflow-hidden">
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        {/* Tab bar */}
-        <div className="px-6 pt-5 pb-0">
-          <TabsList className="bg-muted/70 rounded-xl p-1 h-auto gap-0.5">
-            {[
-              { value: "account",  label: "Account",  soon: false },
-              { value: "security", label: "Security", soon: false },
-              { value: "billing",  label: "Billing",  soon: true  },
-            ].map(tab => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                disabled={tab.soon}
-                className={cn(
-                  "relative rounded-lg px-4 py-1.5 text-sm font-medium transition-colors duration-200",
-                  "text-muted-foreground",
-                  !tab.soon && "hover:text-foreground",
-                  "data-[state=active]:text-foreground",
-                  "data-[state=active]:bg-transparent data-[state=active]:shadow-none",
-                  tab.soon && "cursor-not-allowed opacity-60"
-                )}
-              >
-                {activeTab === tab.value && (
-                  <motion.div
-                    layoutId="activeTabPill"
-                    className="absolute inset-0 rounded-lg bg-background shadow-sm border border-border/40"
-                    transition={{ type: "spring", damping: 30, stiffness: 400, mass: 0.8 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center gap-1.5">
-                  {tab.label}
-                  {tab.soon && (
-                    <span className="text-[9px] font-semibold uppercase tracking-wide bg-muted border border-border/50 text-muted-foreground rounded-full px-1.5 py-0.5 leading-none">
-                      Soon
+      <div className="rounded-3xl border border-border/60 bg-card dark:bg-background shadow-sm">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          {/* Tab bar */}
+          <div className="pl-0 pr-4 bg-muted/40 flex w-full">
+            <TabsList className="bg-transparent p-0 h-auto gap-1 rounded-none flex items-end border-0 w-full">
+              {[
+                { value: "account", label: "Account", soon: false },
+                { value: "security", label: "Security", soon: false },
+                { value: "billing", label: "Plan & Billing", soon: false },
+              ].map((tab, i, arr) => {
+                const prevTab = arr[i - 1]
+                const isAfterActive = prevTab?.value === activeTab
+                return (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    disabled={tab.soon}
+                    className={cn(
+                      `relative px-5 pt-2.5 pb-2 text-sm transition-colors duration-150 -mb-px shadow-none ${i === 0 ? "rounded-tr-xl" : "rounded-t-xl"}`,
+                      "data-[state=active]:bg-card dark:data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:font-bold data-[state=active]:shadow-none data-[state=active]:z-10 data-[state=active]:border data-[state=active]:border-border/60 data-[state=active]:border-b-card dark:data-[state=active]:border-b-background",
+                      i === 0 && "data-[state=active]:border-l-0",
+                      "data-[state=inactive]:bg-transparent data-[state=inactive]:border-0 data-[state=inactive]:text-muted-foreground data-[state=inactive]:font-medium",
+                      "hover:text-foreground",
+                      tab.soon && "cursor-not-allowed opacity-50"
+                    )}
+                  >
+                    {/* Concave junction notch on left when previous tab is active */}
+                    {isAfterActive && (
+                      <span className="absolute -left-2 bottom-0 w-2 h-2 overflow-hidden pointer-events-none">
+                        <span className="absolute bottom-0 right-0 w-4 h-4 rounded-br-xl bg-card" />
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1.5">
+                      {tab.label}
+                      {tab.soon && (
+                        <span className="text-[9px] font-semibold uppercase tracking-wide bg-muted border border-border/50 text-muted-foreground rounded-full px-1.5 py-0.5 leading-none">
+                          Soon
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
+                    {activeTab === tab.value && (
+                      <motion.div
+                        layoutId="activeTabUnderline"
+                        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[3px] bg-foreground rounded-t-full"
+                        transition={{ type: "spring", damping: 30, stiffness: 400, mass: 0.8 }}
+                      />
+                    )}
+                  </TabsTrigger>
+                )
+              })}
+            </TabsList>
+          </div>
 
-        {/* Tab content */}
-        <div className="px-6 pt-5 pb-6 overflow-hidden">
-          <AnimatePresence mode="wait" custom={directionRef.current}>
-            <motion.div
-              key={activeTab}
-              custom={directionRef.current}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              {activeTab === "account"  && <AccountTab  user={user} />}
-              {activeTab === "security" && <SecurityTab user={user} />}
-              {activeTab === "billing"  && <BillingTab  user={user} />}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </Tabs>
-    </div>
+          {/* Tab content */}
+          <div className="px-6 pt-5 pb-6 overflow-hidden">
+            <AnimatePresence mode="wait" custom={directionRef.current}>
+              <motion.div
+                key={activeTab}
+                custom={directionRef.current}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+              >
+                {activeTab === "account" && <AccountTab user={user} />}
+                {activeTab === "security" && <SecurityTab user={user} />}
+                {activeTab === "billing" && <BillingTab user={user} />}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </Tabs>
+      </div>
     </motion.div>
   )
 }

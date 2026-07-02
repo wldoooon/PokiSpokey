@@ -13,11 +13,14 @@ from ..core.logging import logger
 async def create_new_user(db: AsyncSession, user_data: UserCreate) -> User:
     """
     Register a new user in the database.
-    
+
     Creates both User and UserUsage in a single transaction.
     If either fails, both are rolled back (atomic).
     """
-    # 1. Check for duplicates
+    # 1. Normalize email — prevents duplicate accounts via case variation
+    user_data.email = user_data.email.lower().strip()
+
+    # 2. Check for duplicates
     statement = select(User).where(User.email == user_data.email)
     result = await db.exec(statement)
     if result.first():
@@ -55,7 +58,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
     Check credentials and return user if successful.
     Updates last_login_at timestamp on success.
     """
-    statement = select(User).where(User.email == email)
+    statement = select(User).where(User.email == email.lower().strip())
     result = await db.exec(statement)
     user = result.first()
     
@@ -90,6 +93,7 @@ async def get_oauth_user_only(
     STRICT: Get existing user for OAuth login.
     Fails if the user does not exist.
     """
+    email = email.lower().strip()
     statement = select(User).where(User.email == email)
     result = await db.exec(statement)
     user = result.first()
@@ -127,15 +131,15 @@ async def get_or_create_oauth_user(
 ) -> User:
     """
     Get existing user or create new one for OAuth login.
-    
+
     Handles three cases:
     1. User exists with same OAuth provider → update avatar/name, return
     2. User exists with password (no OAuth) → link OAuth to existing account
     3. User doesn't exist → create new OAuth user
-    
+
     Returns the user (existing or newly created).
     """
-    # Try to find existing user by email
+    email = email.lower().strip()
     statement = select(User).where(User.email == email)
     result = await db.exec(statement)
     user = result.first()

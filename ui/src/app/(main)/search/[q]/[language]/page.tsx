@@ -31,8 +31,14 @@ const AiCompletion = dynamic(() => import("@/components/ai-completion").then(mod
 import { SearchLimitWall } from "@/components/features/search-limit-wall"
 import { NoResults } from "@/components/features/search/no-results"
 import { PlayerErrorBoundary } from "@/components/PlayerErrorBoundary"
+import { AppTour } from "@/components/app-tour"
 
 export default function RoutedSearchPage() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const params = useParams<{ q: string; language: string }>()
   const searchParams = useSearchParams()
 
@@ -44,9 +50,8 @@ export default function RoutedSearchPage() {
     import("@/components/features/player/audio-card")
   }, [])
 
-  const safeDecodeURIComponent = (s: string) => { try { return decodeURIComponent(s) } catch { return s } }
-  const q = safeDecodeURIComponent(params.q || "")
-  const languageParam = safeDecodeURIComponent(params.language || "english")
+  const q = params.q || ""
+  const languageParam = params.language || "english"
 
   const categoryParam = searchParams.get("category")
   const categoryForContext = categoryParam || null
@@ -165,8 +170,17 @@ export default function RoutedSearchPage() {
   // 2. Entitlements say no access AND user is anonymous (already blocked before search)
   const showWall = searchBlocked || (isLoaded && !hasAccess && isAnonymous)
 
+  if (!mounted) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   return (
     <>
+      <AppTour ready={playlist.length > 0} />
       <div className="flex-1 flex flex-col min-h-0 bg-transparent text-card-foreground">
         {showWall ? (
           /* ── Signup Wall ── */
@@ -218,6 +232,7 @@ export default function RoutedSearchPage() {
                   <div className="xl:relative sticky top-0 z-40 bg-background/95 backdrop-blur-sm xl:bg-transparent xl:backdrop-blur-none px-4 pt-3 pb-2 sm:px-6">
                     {playlist.length > 0 ? (
                       <PlayerErrorBoundary>
+                        <div id="tour-player">
                         <VideoPlayerCard
                           key={`${q}-${languageParam}`}
                           playlist={playlist}
@@ -228,6 +243,7 @@ export default function RoutedSearchPage() {
                             if (idx < playlist.length - 1) nextVideo()
                           }}
                         />
+                        </div>
                       </PlayerErrorBoundary>
                     ) : (
                       <div className="space-y-3">

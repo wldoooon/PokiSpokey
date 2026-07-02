@@ -31,7 +31,7 @@ const plans: Plan[] = [
 		price: { monthly: 0, yearly: 0 },
 		features: [
 			"50 Searches / month",
-			"60,000 AI Credits / month",
+			"15,000 AI Credits / month",
 			"Unlimited Translations",
 			"All languages included",
 		],
@@ -71,7 +71,7 @@ const plans: Plan[] = [
 		price: { monthly: 20, yearly: 16 },
 		features: [
 			"Unlimited Searches",
-			"Unlimited AI Credits",
+			"15,000,000 AI Credits / month",
 			"Unlimited Translations",
 			"Priority support",
 			"All languages included",

@@ -25,3 +25,5 @@ Caddyfile
 
 # Loguru log files
 logs/
+
+ui/public/how it work.mp4 

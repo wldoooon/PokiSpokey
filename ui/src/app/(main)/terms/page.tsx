@@ -89,10 +89,10 @@ export default function TermsPage() {
               <h2 className="text-base font-semibold text-foreground mb-3">Plans & Billing</h2>
               <p className="mb-3">PokiSpokey offers the following plans:</p>
               <ul className="list-disc pl-5 space-y-1.5">
-                <li><span className="text-foreground font-medium">Free</span> — 50 searches/month, 60,000 AI credits/month, no charge</li>
+                <li><span className="text-foreground font-medium">Free</span> — 50 searches/month, 15,000 AI credits/month, no charge</li>
                 <li><span className="text-foreground font-medium">Basic</span> — 300 searches/month, 800,000 AI credits/month</li>
                 <li><span className="text-foreground font-medium">Pro</span> — unlimited searches, 5,000,000 AI credits/month</li>
-                <li><span className="text-foreground font-medium">Max</span> — unlimited searches and AI credits</li>
+                <li><span className="text-foreground font-medium">Max</span> — unlimited searches, 15,000,000 AI credits/month</li>
               </ul>
               <p className="mt-4 mb-3">Billing terms:</p>
               <ul className="list-disc pl-5 space-y-1.5">

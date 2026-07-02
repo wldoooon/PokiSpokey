@@ -33,7 +33,7 @@ import axios from "axios"
 const emailSchema = z.object({ email: z.string().email() })
 const otpSchema = z.object({ otp: z.string().min(6, "Must be 6 digits") })
 const resetSchema = z.object({
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",

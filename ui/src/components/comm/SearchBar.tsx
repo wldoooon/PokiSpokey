@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, X, ArrowRight, ChevronDown, Check, Clock, Lock, Video, Tv, Mic, Music, LayoutGrid } from 'lucide-react';
+import { Search, X, ArrowRight, ChevronDown, Check, Clock, Lock, Video, Tv, Mic, Music, LayoutGrid, HelpCircle } from 'lucide-react';
+import { startTour } from '@/components/app-tour';
 import { cn } from '@/lib/utils';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSearchStore } from '@/stores/use-search-store';
@@ -263,8 +264,10 @@ export function SearchBar() {
     }, [isLoaded, hasAccess, isUnlimited, showLimitToast]);
 
     const handleSearch = useCallback((searchQuery?: string) => {
-        const q = searchQuery || query;
-        if (!q.trim()) return;
+        const raw = searchQuery || query;
+        // Strip Manticore full-text operators to prevent query injection
+        const q = raw.replace(/[!"()|~*?^@\\-]/g, "").trim();
+        if (!q) return;
 
         // Fix #4: Guard against access bypass via keyboard Enter
         if (!hasAccess) {
@@ -338,7 +341,7 @@ export function SearchBar() {
     const panelVisible = showRecent && !isSearching && (recentSearches.length > 0 || hasSuggestions);
 
     return (
-        <div className="w-full max-w-4xl flex items-center gap-4 relative z-50" ref={containerRef}>
+        <div id="tour-search" className="w-full max-w-4xl flex items-center gap-4 relative z-50" ref={containerRef}>
             <div className="flex-1">
                 <div className={cn(
                     "search-animated-border group relative transition-all duration-300",
@@ -351,6 +354,7 @@ export function SearchBar() {
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
+                                    id="tour-category"
                                     variant="ghost"
                                     size="sm"
                                     className={cn(
@@ -487,6 +491,7 @@ export function SearchBar() {
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
+                                    id="tour-language"
                                     variant="ghost"
                                     size="sm"
                                     className={cn(
@@ -563,6 +568,14 @@ export function SearchBar() {
                     </div>
                 </div>
             </div>
+
+            <button
+                onClick={startTour}
+                title="How it works"
+                className="h-9 w-9 rounded-full border border-border shadow-sm bg-card flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+                <HelpCircle className="h-4 w-4" />
+            </button>
 
             {/* Unified Suggestions & Recents Panel */}
             {panelVisible && (

@@ -5,7 +5,7 @@ import dynamic from "next/dynamic"
 import { useSearchStore } from "@/stores/use-search-store"
 import { usePlayerStore } from "@/stores/use-player-store"
 import { VideoPlayerSkeleton, TranscriptSkeleton, AiCompletionSkeleton } from "./WatchSkeletons"
-import { PanelRightClose, PanelRightOpen, Bot, Play } from "lucide-react"
+import { PanelRightClose, PanelRightOpen, Bot, Play, Loader2 } from "lucide-react"
 
 // Dynamic imports for heavy components
 const VideoPlayerCard = dynamic(
@@ -49,6 +49,11 @@ function SearchParamSyncer({ word }: { word: string }) {
 }
 
 export default function WatchClientPage({ word }: { word: string }) {
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
     const { category, language, subCategory } = useSearchStore()
     const { currentVideoIndex, resetIndex } = usePlayerStore()
 
@@ -65,6 +70,14 @@ export default function WatchClientPage({ word }: { word: string }) {
     const [contextSnippet, setContextSnippet] = useState<string | null>(null)
     const [isAiCollapsed, setIsAiCollapsed] = useState(false)
     const [mobileTab, setMobileTab] = useState<"player" | "ai">("player")
+
+    if (!mounted) {
+        return (
+            <div className="flex-1 flex items-center justify-center min-h-[50vh]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
 
     return (
         <>
