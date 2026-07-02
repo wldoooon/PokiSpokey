@@ -50,8 +50,8 @@ export default function RoutedSearchPage() {
     import("@/components/features/player/audio-card")
   }, [])
 
-  const q = params.q || ""
-  const languageParam = params.language || "english"
+  const q = params.q ? decodeURIComponent(params.q) : ""
+  const languageParam = params.language ? decodeURIComponent(params.language) : "english"
 
   const categoryParam = searchParams.get("category")
   const categoryForContext = categoryParam || null
