@@ -3,10 +3,11 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import HTTPException, status
 
-from ..models.user import User, UserCreate
+from ..models.user import User, UserCreate, UserTier
 from ..models.user_usage import UserUsage
 from ..core.security import hash_password, verify_password
 from ..core.logging import logger
+from .usage_service import MONTHLY_SEARCH_LIMITS
 
 
 
@@ -45,9 +46,9 @@ async def create_new_user(db: AsyncSession, user_data: UserCreate) -> User:
     await db.flush()  # Get user.id without committing
     
     # 4. Create UserUsage (linked to new user)
-    user_usage = UserUsage(user_id=new_user.id)
+    user_usage = UserUsage(user_id=new_user.id, total_searches=MONTHLY_SEARCH_LIMITS[UserTier.FREE])
     db.add(user_usage)
-    
+
     # 5. Commit BOTH in one transaction
     await db.commit()
     return new_user
@@ -185,7 +186,7 @@ async def get_or_create_oauth_user(
     await db.flush()
 
     # Create UserUsage record
-    user_usage = UserUsage(user_id=new_user.id)
+    user_usage = UserUsage(user_id=new_user.id, total_searches=MONTHLY_SEARCH_LIMITS[UserTier.FREE])
     db.add(user_usage)
 
     await db.commit()

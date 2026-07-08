@@ -12,7 +12,7 @@ from ..models.user import User, UserTier
 from ..models.subscription import Subscription, SubscriptionStatus
 from ..models.invoice import Invoice, PaymentStatus
 from ..models.webhook_event import WebhookEvent
-from .usage_service import reset_ai_credits
+from .usage_service import reset_ai_credits, reset_search_limit
 
 settings = get_settings()
 
@@ -201,6 +201,7 @@ async def _on_sub_active(data: dict, db: AsyncSession, ev: WebhookEvent) -> None
         db.add(sub)
 
     await reset_ai_credits(db, user, PLAN_TO_TIER[plan])
+    await reset_search_limit(db, user, PLAN_TO_TIER[plan])
     await db.flush()
     ev.user_id = user.id
     ev.subscription_id = sub.id
@@ -221,6 +222,7 @@ async def _on_sub_renewed(data: dict, db: AsyncSession, ev: WebhookEvent) -> Non
     user = await db.get(User, sub.user_id)
     if user:
         await reset_ai_credits(db, user, user.tier)
+        await reset_search_limit(db, user, user.tier)
     ev.subscription_id = sub.id
     ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] Subscription {sub.id} renewed until {sub.current_period_end}")
@@ -257,6 +259,7 @@ async def _on_sub_cancelled(data: dict, db: AsyncSession, ev: WebhookEvent) -> N
         canceled_at=_parse_dt(data.get("cancelled_at")) or datetime.now(timezone.utc),
     )
     await reset_ai_credits(db, user, UserTier.FREE)
+    await reset_search_limit(db, user, UserTier.FREE)
     ev.subscription_id = sub.id
     ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] {user.email} downgraded to free — subscription cancelled")
@@ -283,6 +286,7 @@ async def _on_sub_expired(data: dict, db: AsyncSession, ev: WebhookEvent) -> Non
     db.add(user)
     await _patch_sub(sub, db, status=SubscriptionStatus.EXPIRED, ended_at=datetime.now(timezone.utc))
     await reset_ai_credits(db, user, UserTier.FREE)
+    await reset_search_limit(db, user, UserTier.FREE)
     ev.subscription_id = sub.id
     ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] {user.email} downgraded to free — subscription expired")
@@ -313,6 +317,7 @@ async def _on_sub_plan_changed(data: dict, db: AsyncSession, ev: WebhookEvent) -
         current_period_end=_parse_dt(data.get("next_billing_date")),
     )
     await reset_ai_credits(db, user, new_tier)
+    await reset_search_limit(db, user, new_tier)
     ev.subscription_id = sub.id
     ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] {user.email} plan changed to {plan} ({billing_period})")
