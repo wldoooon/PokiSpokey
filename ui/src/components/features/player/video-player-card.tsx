@@ -120,10 +120,22 @@ export default function VideoPlayerCard({
     } catch { }
   }
 
+  const erroredClipsRef = useRef<Set<string>>(new Set())
+
   // ── Sync effect: fires when active slot or clip ids change ────────────────
   const activeClipId = activeKey === 'A' ? clipA?.video_id : clipB?.video_id
 
   useEffect(() => {
+    // If the newly active clip previously errored (e.g. in background), skip it immediately
+    const activeClip = activeKey === 'A' ? clipA : clipB;
+    if (activeClip && erroredClipsRef.current.has(activeClip.video_id)) {
+      consecutiveAutoSkipsRef.current += 1;
+      if (consecutiveAutoSkipsRef.current <= 10) {
+        usePlayerStore.getState().nextVideo();
+      }
+      return;
+    }
+
     let currentActive: YTPlayer | null = null
     if (activeKey === 'A') currentActive = playerARef.current
     if (activeKey === 'B') currentActive = playerBRef.current
@@ -165,7 +177,7 @@ export default function VideoPlayerCard({
     syncSinglePlayer('A', playerARef.current)
     syncSinglePlayer('B', playerBRef.current)
 
-  }, [activeKey, activeClipId, isMuted, playbackRate, setPlayer, clipA?.video_id, clipB?.video_id, activePlayer])
+  }, [activeKey, activeClipId, isMuted, playbackRate, setPlayer, clipA, clipB, activePlayer])
 
   const startPolling = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
@@ -258,12 +270,15 @@ export default function VideoPlayerCard({
 
   // ── Error handler ─────────────────────────────────────────────────────────
   const onVideoError = (event: { data: number }, key: 'A' | 'B') => {
-    if (key !== activeKey) return
-    if ([100, 101, 150].includes(event.data)) {
-      clearStallTimer()
-      consecutiveAutoSkipsRef.current += 1
-      if (consecutiveAutoSkipsRef.current <= 5) {
-        usePlayerStore.getState().nextVideo()
+    const clip = key === 'A' ? clipA : clipB;
+    if (clip && [100, 101, 150].includes(event.data)) {
+      erroredClipsRef.current.add(clip.video_id);
+      if (key === activeKey) {
+        clearStallTimer()
+        consecutiveAutoSkipsRef.current += 1
+        if (consecutiveAutoSkipsRef.current <= 10) {
+          usePlayerStore.getState().nextVideo()
+        }
       }
     }
   }

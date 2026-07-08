@@ -1051,10 +1051,11 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
   const searchCurrent = usage.search?.current ?? 0
   const searchLimit = usage.search?.limit ?? 0
 
-  const sparksUnlimited = sparksLimit === -1
+  // limit === -1 means unlimited, but if balance has actually hit 0 the user is out of credits
+  const sparksUnlimited = sparksLimit === -1 && sparksBalance !== 0
   const searchUnlimited = searchLimit === -1
   const sparksUsed = sparksUnlimited ? 0 : Math.max(0, sparksLimit - sparksBalance)
-  const sparksRemaining = sparksUnlimited ? Infinity : sparksBalance
+  const sparksRemaining = sparksUnlimited ? Infinity : Math.max(0, sparksBalance)
 
   const activePlanId = sub?.plan ?? "free"
   const currentPlan = PLANS.find(p => p.id === activePlanId) ?? PLANS[0]

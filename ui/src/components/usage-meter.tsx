@@ -114,6 +114,10 @@ export function UsageMeter() {
                         const sparkBalance   = sparks.balance ?? sparks.remaining ?? Math.max(0, sparkLimit - sparkUsed)
                         const searchRemaining = searches.remaining ?? Math.max(0, searches.limit - searches.current)
 
+                        // limit === -1 means unlimited, but if balance has actually reached 0
+                        // the user is out of credits — don't let the unlimited flag hide that.
+                        const effectiveSparkLimit = sparkLimit === -1 && sparkBalance === 0 ? 0 : sparkLimit
+
                         return (
                             <>
                                 <UsageRow
@@ -128,7 +132,7 @@ export function UsageMeter() {
                                         icon={ZapIcon}
                                         label="AI Credits"
                                         used={sparkUsed}
-                                        total={sparkLimit}
+                                        total={effectiveSparkLimit}
                                         valueLabel={sparkBalance >= 0 ? `${fmt(sparkBalance)} left` : "∞ Unlimited"}
                                     />
                                 )}
