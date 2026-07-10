@@ -372,9 +372,12 @@ async def change_subscription_plan(user: User, db: AsyncSession, plan: str, bill
     if sub.dodo_product_id == product_id:
         raise ValueError("Already on this plan.")
 
-    await dodo_client.get().subscriptions.update(
+    await dodo_client.get().subscriptions.change_plan(
         sub.dodo_subscription_id,
         product_id=product_id,
+        proration_billing_mode="prorated_immediately",
+        quantity=1,
+        effective_at="immediately",
     )
     logger.info(f"[BILLING] Plan change requested for user {user.id}: {sub.plan} → {plan} ({billing_period})")
 
