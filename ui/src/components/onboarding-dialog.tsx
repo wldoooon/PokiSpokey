@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { useTheme } from "next-themes"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -12,6 +12,7 @@ import { AuthDialog } from "@/components/auth-dialog"
 import { startTour } from "@/components/app-tour"
 
 const WELCOME_KEY = "vl_welcome_done"
+const DEMO_VIDEO_SRC = "https://me78yeazv3ihsfxh.public.blob.vercel-storage.com/how%20it%20work.mp4"
 const STEPS = ["welcome", "how", "tour", "start"] as const
 const SI_LABELS = ["Welcome", "In Action", "Guided Tour", "Ready"]
 
@@ -180,16 +181,18 @@ const HOW_TITLE = "See it in action"
 function StepHow({ active, onRegisterExit }: { active: boolean; onRegisterExit: (fn: () => Promise<void>) => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [videoReady, setVideoReady] = useState(false)
 
   useEffect(() => {
     if (!videoRef.current) return
     if (active) {
-      videoRef.current.currentTime = 1
       videoRef.current.play().catch(() => {})
     } else {
       videoRef.current.pause()
     }
   }, [active])
+
+  const handleCanPlay = useCallback(() => setVideoReady(true), [])
 
   useGSAP(() => {
     const tl = gsap.timeline({ delay: 0.25 })
@@ -220,18 +223,25 @@ function StepHow({ active, onRegisterExit }: { active: boolean; onRegisterExit: 
       <h2 className="h-char text-lg font-extrabold tracking-tight text-foreground shrink-0">
         {HOW_TITLE}
       </h2>
-      <div className="h-video overflow-hidden rounded-xl border border-border/50 flex-1 min-h-0">
+      <div className="h-video overflow-hidden rounded-xl border border-border/50 flex-1 min-h-0 relative">
+        {/* Loading skeleton — shown until the browser has buffered enough to play */}
+        {!videoReady && (
+          <div className="absolute inset-0 bg-muted animate-pulse rounded-xl" />
+        )}
         <video
           ref={videoRef}
-          src="https://me78yeazv3ihsfxh.public.blob.vercel-storage.com/how%20it%20work.mp4"
+          src={DEMO_VIDEO_SRC}
+          preload="auto"
           playsInline
+          onCanPlay={handleCanPlay}
           onEnded={() => {
-            if (videoRef.current) {
-              videoRef.current.currentTime = 1
-              videoRef.current.play().catch(() => {})
-            }
+            if (videoRef.current) videoRef.current.play().catch(() => {})
           }}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          style={{
+            width: "100%", height: "100%", objectFit: "cover", display: "block",
+            opacity: videoReady ? 1 : 0,
+            transition: "opacity 0.25s ease",
+          }}
         />
       </div>
     </div>
@@ -333,6 +343,18 @@ export function OnboardingDialog() {
     _openOnboarding = () => { setStep(0); setDirection(1); setOpen(true) }
     return () => { _openOnboarding = null }
   }, [])
+
+  // Preload the demo video as soon as the dialog opens so it's ready by step 2
+  useEffect(() => {
+    if (!open) return
+    const link = document.createElement("link")
+    link.rel = "preload"
+    link.as = "video"
+    link.type = "video/mp4"
+    link.href = DEMO_VIDEO_SRC
+    document.head.appendChild(link)
+    return () => { document.head.removeChild(link) }
+  }, [open])
 
   useEffect(() => {
     if (!localStorage.getItem(WELCOME_KEY)) setOpen(true)

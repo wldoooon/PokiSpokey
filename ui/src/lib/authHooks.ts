@@ -1,11 +1,31 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/apiClient";
 import type { LoginResponse, SignupResponse, UserRead } from "@/lib/authTypes";
 import axios from "axios";
 
 import { toastManager } from "@/components/ui/toast";
+import { startTour } from "@/components/app-tour";
+
+/**
+ * After a fresh ["me"] refetch, check if the user hasn't seen the tour yet.
+ * If so — mark it as seen in DB + cache, then fire the tour after a short delay
+ * so any page transitions / dialogs have settled first.
+ */
+async function triggerTourIfNew(queryClient: QueryClient): Promise<void> {
+  const user = queryClient.getQueryData<UserRead | null>(["me"]);
+  if (!user || user.is_tour_seen) return;
+  try {
+    await apiClient.post("/auth/mark-tour-seen");
+    queryClient.setQueryData<UserRead | null>(["me"], (prev) =>
+      prev ? { ...prev, is_tour_seen: true } : prev
+    );
+  } catch {
+    // non-critical — tour fires regardless
+  }
+  setTimeout(() => startTour(), 800);
+}
 
 export function useMeQuery() {
   return useQuery<UserRead | null>({
@@ -37,7 +57,8 @@ export function useLoginMutation() {
       return res.data;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      await queryClient.refetchQueries({ queryKey: ["me"] });
+      await triggerTourIfNew(queryClient);
       toastManager.add({ title: "Welcome back!", type: "success" });
     },
   });
@@ -116,8 +137,9 @@ export function useVerifyEmailMutation() {
       );
       return res.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["me"] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["me"] });
+      await triggerTourIfNew(queryClient);
       toastManager.add({ title: "Email verified!", description: "Welcome aboard — you're all set.", type: "success" });
     },
   });
