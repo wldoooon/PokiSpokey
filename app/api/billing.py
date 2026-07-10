@@ -14,6 +14,7 @@ from ..services.billing import (
     handle_webhook,
     cancel_subscription,
     reactivate_subscription,
+    change_subscription_plan,
 )
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -28,6 +29,11 @@ class CheckoutRequest(BaseModel):
 
 class CancelRequest(BaseModel):
     reason: str | None = None  # optional churn reason from UI
+
+
+class UpgradeRequest(BaseModel):
+    plan: str            # "basic" | "pro" | "max"
+    billing_period: str  # "monthly" | "yearly"
 
 
 # ── Checkout ─────────────────────────────────────────────────────────────────
@@ -129,6 +135,34 @@ async def cancel(
     except Exception as e:
         logger.error(f"[BILLING] Cancel failed for user {current_user.id}: {e}")
         raise HTTPException(status_code=502, detail="Failed to cancel subscription.")
+
+
+# ── Upgrade / Downgrade ───────────────────────────────────────────────────────
+
+@router.post("/upgrade")
+async def upgrade_plan(
+    body: UpgradeRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Mutates the existing active subscription to a different plan/period.
+    Fires subscription.plan_changed webhook which handles the tier update.
+    Use this instead of /checkout when the user already has an active subscription.
+    """
+    try:
+        await change_subscription_plan(
+            user=current_user,
+            db=db,
+            plan=body.plan,
+            billing_period=body.billing_period,
+        )
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[BILLING] Upgrade failed for user {current_user.id}: {e}")
+        raise HTTPException(status_code=502, detail="Failed to change subscription plan.")
 
 
 # ── Payment Methods ───────────────────────────────────────────────────────────

@@ -61,6 +61,9 @@ class User(UserBase, table=True):
         sa_column=Column(DateTime(timezone=True))
     )
 
+    # Onboarding — flipped to True the first time the user sees the search tour
+    is_tour_seen: bool = Field(default=False)
+
     # Dodo billing — customer identity only (permanent, survives cancellation/resubscription)
     dodo_customer_id: str | None = Field(default=None, index=True, unique=True)
 
@@ -92,6 +95,7 @@ class UserRead(UserBase):
     """What the API returns to the frontend"""
     id: uuid.UUID
     is_email_verified: bool
+    is_tour_seen: bool = False
     oauth_provider: str | None = None
     oauth_avatar_url: str | None = None
     last_login_at: datetime | None = None
