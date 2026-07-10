@@ -12,6 +12,14 @@ import { toastManager } from "@/components/ui/toast";
 import { AuthDialog } from "@/components/auth-dialog";
 import { useSubscriptionQuery } from "@/lib/billingHooks";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
+	DialogFooter,
+} from "@/components/ui/dialog";
 
 type Plan = {
 	name: string;
@@ -148,37 +156,44 @@ export function PricingCard({
 	...props
 }: PricingCardProps) {
 	const [loading, setLoading] = useState(false);
+	const [confirmOpen, setConfirmOpen] = useState(false);
 	const status = useAuthStore((s) => s.status);
 	const queryClient = useQueryClient();
 	const isCurrentPlan = userTier === plan.name.toLowerCase();
 	const isPaidPlan = !!plan.plan;
 	const isLoggedIn = status === "authenticated";
 
+	const handleUpgradeConfirmed = async () => {
+		setConfirmOpen(false);
+		setLoading(true);
+		try {
+			await apiClient.post("/billing/upgrade", { plan: plan.plan, billing_period: frequency });
+			toastManager.add({
+				title: "Plan updated!",
+				description: "Your subscription has been changed. It may take a moment to reflect.",
+				type: "success",
+			});
+			queryClient.invalidateQueries({ queryKey: ["billing", "subscription"] });
+			queryClient.invalidateQueries({ queryKey: ["me"] });
+		} catch (err: any) {
+			const msg = err?.response?.data?.detail ?? err?.message ?? "Could not change plan. Please try again.";
+			toastManager.add({ title: "Plan change failed", description: msg, type: "error" });
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	const handleCheckout = async () => {
 		if (!plan.plan) return;
-		setLoading(true);
 
-		// User already has an active subscription — mutate it instead of creating a new one
+		// User already has an active subscription — show confirmation dialog first
 		if (hasActiveSub) {
-			try {
-				await apiClient.post("/billing/upgrade", { plan: plan.plan, billing_period: frequency });
-				toastManager.add({
-					title: "Plan updated!",
-					description: "Your subscription has been changed. It may take a moment to reflect.",
-					type: "success",
-				});
-				queryClient.invalidateQueries({ queryKey: ["billing", "subscription"] });
-				queryClient.invalidateQueries({ queryKey: ["me"] });
-			} catch (err: any) {
-				const msg = err?.response?.data?.detail ?? err?.message ?? "Could not change plan. Please try again.";
-				toastManager.add({ title: "Plan change failed", description: msg, type: "error" });
-			} finally {
-				setLoading(false);
-			}
+			setConfirmOpen(true);
 			return;
 		}
 
 		// No active subscription — open a fresh checkout session
+		setLoading(true);
 		try {
 			const { data } = await apiClient.post<{ checkout_url: string }>(
 				"/billing/checkout",
@@ -250,6 +265,8 @@ export function PricingCard({
 			>
 				{loading ? (
 					<Loader2 className="size-4 animate-spin" />
+				) : hasActiveSub ? (
+					`Upgrade to ${plan.name}`
 				) : (
 					plan.btn
 				)}
@@ -354,6 +371,29 @@ export function PricingCard({
 			>
 				{renderButton()}
 			</div>
+
+			<Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Upgrade to {plan.name}?</DialogTitle>
+						<DialogDescription>
+							You&apos;ll be charged a prorated amount for the rest of this billing period, then{" "}
+							<span className="font-semibold text-foreground">
+								${plan.price[frequency]}/month
+							</span>{" "}
+							going forward. This action cannot be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setConfirmOpen(false)}>
+							Cancel
+						</Button>
+						<Button onClick={handleUpgradeConfirmed} disabled={loading}>
+							{loading ? <Loader2 className="size-4 animate-spin" /> : "Confirm Upgrade"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

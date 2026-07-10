@@ -423,7 +423,9 @@ export function OnboardingDialog() {
               ← Back
             </Button>
           ) : (
-            <div />
+            <Button variant="ghost" size="sm" onClick={() => close()} className="text-muted-foreground">
+              Skip
+            </Button>
           )}
 
           {step < total - 1 && (

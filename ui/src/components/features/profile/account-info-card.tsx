@@ -293,7 +293,7 @@ function DeleteAccountDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) setConfirmText(""); onOpenChange(v) }}>
-      <DialogContent className="rounded-2xl max-w-sm" showCloseButton={false}>
+      <DialogContent className="rounded-2xl max-w-sm">
         <div className="flex flex-col items-center gap-5 pt-2">
           <motion.div
             {...stagger(0)}
@@ -1131,7 +1131,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
 
       {/* Cancel subscription dialog */}
       <Dialog open={cancelOpen} onOpenChange={(v) => { if (!v) { setCancelReasons([]); setCancelConfirm("") } setCancelOpen(v) }}>
-        <DialogContent className="rounded-2xl sm:max-w-[1100px] w-full p-0 overflow-hidden" showCloseButton={false}>
+        <DialogContent className="rounded-2xl sm:max-w-[1100px] w-full p-0 overflow-hidden">
           <div className="flex min-h-[600px]">
             {/* Left — image */}
             <div className="hidden md:block w-1/2 shrink-0 relative">
