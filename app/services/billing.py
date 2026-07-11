@@ -12,7 +12,7 @@ from ..models.user import User, UserTier
 from ..models.subscription import Subscription, SubscriptionStatus
 from ..models.invoice import Invoice, PaymentStatus
 from ..models.webhook_event import WebhookEvent
-from .usage_service import reset_ai_credits
+from .usage_service import reset_ai_credits, reset_search_limit
 
 settings = get_settings()
 
@@ -201,6 +201,7 @@ async def _on_sub_active(data: dict, db: AsyncSession, ev: WebhookEvent) -> None
         db.add(sub)
 
     await reset_ai_credits(db, user, PLAN_TO_TIER[plan])
+    await reset_search_limit(db, user, PLAN_TO_TIER[plan])
     await db.flush()
     ev.user_id = user.id
     ev.subscription_id = sub.id
@@ -221,6 +222,7 @@ async def _on_sub_renewed(data: dict, db: AsyncSession, ev: WebhookEvent) -> Non
     user = await db.get(User, sub.user_id)
     if user:
         await reset_ai_credits(db, user, user.tier)
+        await reset_search_limit(db, user, user.tier)
     ev.subscription_id = sub.id
     ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] Subscription {sub.id} renewed until {sub.current_period_end}")
@@ -257,6 +259,7 @@ async def _on_sub_cancelled(data: dict, db: AsyncSession, ev: WebhookEvent) -> N
         canceled_at=_parse_dt(data.get("cancelled_at")) or datetime.now(timezone.utc),
     )
     await reset_ai_credits(db, user, UserTier.FREE)
+    await reset_search_limit(db, user, UserTier.FREE)
     ev.subscription_id = sub.id
     ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] {user.email} downgraded to free — subscription cancelled")
@@ -283,6 +286,7 @@ async def _on_sub_expired(data: dict, db: AsyncSession, ev: WebhookEvent) -> Non
     db.add(user)
     await _patch_sub(sub, db, status=SubscriptionStatus.EXPIRED, ended_at=datetime.now(timezone.utc))
     await reset_ai_credits(db, user, UserTier.FREE)
+    await reset_search_limit(db, user, UserTier.FREE)
     ev.subscription_id = sub.id
     ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] {user.email} downgraded to free — subscription expired")
@@ -313,9 +317,24 @@ async def _on_sub_plan_changed(data: dict, db: AsyncSession, ev: WebhookEvent) -
         current_period_end=_parse_dt(data.get("next_billing_date")),
     )
     await reset_ai_credits(db, user, new_tier)
+    await reset_search_limit(db, user, new_tier)
     ev.subscription_id = sub.id
     ev.user_id = sub.user_id
     logger.info(f"[WEBHOOK] {user.email} plan changed to {plan} ({billing_period})")
+
+
+async def _on_sub_failed(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    user = await _get_user(data, db)
+    if not user:
+        logger.warning(f"[WEBHOOK] subscription.failed — user not found: {data}")
+        return
+    if user.tier != UserTier.FREE:
+        user.tier = UserTier.FREE
+        db.add(user)
+        await reset_ai_credits(db, user, UserTier.FREE)
+        await reset_search_limit(db, user, UserTier.FREE)
+    ev.user_id = user.id
+    logger.error(f"[WEBHOOK] Subscription mandate creation failed for {user.email} — forced to FREE")
 
 
 # ── Cancel Subscription ───────────────────────────────────────────────────────
@@ -337,6 +356,31 @@ async def cancel_subscription(user: User, db: AsyncSession) -> None:
 
 
 # ── Reactivate Subscription ───────────────────────────────────────────────────
+
+async def change_subscription_plan(user: User, db: AsyncSession, plan: str, billing_period: str) -> None:
+    """Change the product on an existing active subscription (upgrade or downgrade)."""
+    result = await db.execute(select(Subscription).where(Subscription.user_id == user.id))
+    sub = result.scalars().first()
+    if not sub:
+        raise ValueError("No subscription found.")
+    if sub.status not in (SubscriptionStatus.ACTIVE, SubscriptionStatus.ON_HOLD):
+        raise ValueError("Subscription is not active.")
+
+    product_id = PLAN_TO_PRODUCT.get((plan.lower(), billing_period.lower()))
+    if not product_id:
+        raise ValueError(f"Unknown plan/period: {plan}/{billing_period}")
+    if sub.dodo_product_id == product_id:
+        raise ValueError("Already on this plan.")
+
+    await dodo_client.get().subscriptions.change_plan(
+        sub.dodo_subscription_id,
+        product_id=product_id,
+        proration_billing_mode="prorated_immediately",
+        quantity=1,
+        effective_at="immediately",
+    )
+    logger.info(f"[BILLING] Plan change requested for user {user.id}: {sub.plan} → {plan} ({billing_period})")
+
 
 async def reactivate_subscription(user: User, db: AsyncSession) -> None:
     result = await db.execute(select(Subscription).where(Subscription.user_id == user.id))
@@ -409,6 +453,7 @@ _HANDLERS = {
     "subscription.cancelled":    _on_sub_cancelled,
     "subscription.on_hold":      _on_sub_on_hold,
     "subscription.expired":      _on_sub_expired,
+    "subscription.failed":       _on_sub_failed,
     "subscription.plan_changed": _on_sub_plan_changed,
     "payment.succeeded": lambda d, db, ev: _on_payment(d, db, ev, PaymentStatus.SUCCEEDED),
     "payment.failed":    lambda d, db, ev: _on_payment(d, db, ev, PaymentStatus.FAILED),

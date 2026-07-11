@@ -15,12 +15,9 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = ""
 
-    # Email
-    MAIL_USERNAME: str = ""
-    MAIL_PASSWORD: str = ""
-    MAIL_FROM: str = ""
-    MAIL_PORT: int = 587
-    MAIL_SERVER: str = "smtp.gmail.com"
+    # Email (Resend)
+    RESEND_KEY: str = ""
+    MAIL_FROM: str = "noreply@pokispokey.com"
 
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6000

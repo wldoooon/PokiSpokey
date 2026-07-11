@@ -11,13 +11,11 @@ from ..core.logging import logger
 
 settings = get_settings()
 
-FEATURE_LIMITS = {
-    "search": {
-        UserTier.FREE:  50,
-        UserTier.BASIC: 300,
-        UserTier.PRO:   -1,
-        UserTier.MAX:   -1,
-    }
+MONTHLY_SEARCH_LIMITS = {
+    UserTier.FREE:  50,
+    UserTier.BASIC: 300,
+    UserTier.PRO:   -1,
+    UserTier.MAX:   -1,
 }
 
 # Monthly AI credit (Sparks) allocation per tier.
@@ -29,7 +27,7 @@ TIER_SPARKS = {
 }
 
 ANONYMOUS_LIMITS = {
-    "search": 3
+    "search": 6
 }
 
 
@@ -37,13 +35,6 @@ def _get_redis_key(identifier: str, feature: str) -> str:
     today = date.today()
     month_key = f"{today.year}-{today.month:02}"
     return f"usage:{identifier}:{feature}:{month_key}"
-
-
-def _get_limit(tier: Optional[UserTier], feature: str) -> int:
-    """Get the limit for a feature based on tier. Returns -1 for unlimited."""
-    if tier is None:
-        return ANONYMOUS_LIMITS.get(feature, 0)
-    return FEATURE_LIMITS.get(feature, {}).get(tier, 0)
 
 
 async def check_usage_limit(
@@ -55,19 +46,17 @@ async def check_usage_limit(
 ) -> Tuple[bool, Optional[str], int, int]:
     """
     Check if user can perform the action.
-    
+
     Returns: (allowed, error_message, current_count, limit)
     """
-    # Determine identifier and tier
     if user:
         identifier = f"user:{user.id}"
-        tier = user.tier
+        # Use per-user quota stored in DB (overridable per user)
+        usage = await db.get(UserUsage, user.id)
+        limit = usage.total_searches if usage else MONTHLY_SEARCH_LIMITS.get(user.tier, 50)
     else:
         identifier = f"ip:{client_ip}"
-        tier = None
-    
-    # Get limit for this tier
-    limit = _get_limit(tier, feature)
+        limit = ANONYMOUS_LIMITS.get(feature, 0)
     
     # -1 means unlimited
     if limit == -1:
@@ -184,7 +173,7 @@ async def get_user_usage_stats(
     search_count_str = await redis.get(f"usage:{identifier}:search:{month_key}")
     search_count = int(search_count_str or 0)
     
-    # Get lifetime stats from PostgreSQL (optional, don't block if missing)
+    # Get usage record from PostgreSQL for AI balance and per-user search quota
     try:
         usage = await db.get(UserUsage, user.id)
     except Exception as e:
@@ -192,7 +181,7 @@ async def get_user_usage_stats(
         usage = None
     
     ai_limit = TIER_SPARKS.get(tier, TIER_SPARKS[UserTier.FREE])
-    search_limit = _get_limit(tier, "search")
+    search_limit = usage.total_searches if usage else MONTHLY_SEARCH_LIMITS.get(tier, 50)
 
     raw_balance = usage.ai_credit_balance if usage else 0
     balance = min(raw_balance, ai_limit) if ai_limit != -1 else raw_balance
@@ -210,10 +199,6 @@ async def get_user_usage_stats(
                 "limit": ai_limit,
                 "remaining": balance
             },
-        },
-        "lifetime": {
-            "total_searches": usage.total_searches if usage else 0,
-            "total_ai_chats": usage.total_ai_chats if usage else 0,
         },
     }
 
@@ -302,21 +287,8 @@ async def sync_all_dirty_users(redis: Redis):
                     usage.usage_reset_at.year == today.year
                 )
 
-                if is_current_month:
-                    delta = max(0, search_count - usage.searches_count)
-                    usage.total_searches += delta
-                else:
-                    # Phantom Data Loss Fix: Fetch the final count from the old month
-                    old_date = usage.usage_reset_at
-                    old_month_key = f"{old_date.year}-{old_date.month:02}"
-                    old_search_count = int(await redis.get(f"usage:{identifier}:search:{old_month_key}") or 0)
-
-                    # Add remaining searches from the old month
-                    if old_search_count > usage.searches_count:
-                        usage.total_searches += (old_search_count - usage.searches_count)
-
+                if not is_current_month:
                     # Start the new month
-                    usage.total_searches += search_count
                     usage.usage_reset_at = datetime.now(timezone.utc)
 
                     # Free Tier Eternal Death Bug Fix: Reset FREE users' Sparks on the 1st
@@ -354,6 +326,18 @@ async def reset_ai_credits(db: AsyncSession, user: User, tier: UserTier) -> None
         .values(ai_credit_balance=new_balance)
     )
     logger.info(f"[Credits] Reset AI credits for user {user.id} → {new_balance} ({tier})")
+
+
+async def reset_search_limit(db: AsyncSession, user: User, tier: UserTier) -> None:
+    """Set per-user monthly search quota to the tier's allocation. Called on subscription events."""
+    from sqlalchemy import update as sa_update
+    new_limit = MONTHLY_SEARCH_LIMITS.get(tier, MONTHLY_SEARCH_LIMITS[UserTier.FREE])
+    await db.execute(
+        sa_update(UserUsage)
+        .where(UserUsage.user_id == user.id)
+        .values(total_searches=new_limit)
+    )
+    logger.info(f"[Search] Reset search limit for user {user.id} → {new_limit} ({tier})")
 
 
 async def check_ai_credits(db: AsyncSession, user: User) -> Tuple[bool, Optional[str], int]:

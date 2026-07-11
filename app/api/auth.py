@@ -187,12 +187,25 @@ async def me(
         "is_active": current_user.is_active,
         "tier": current_user.tier,
         "is_email_verified": current_user.is_email_verified,
+        "is_tour_seen": current_user.is_tour_seen,
         "oauth_provider": current_user.oauth_provider,
         "oauth_avatar_url": current_user.oauth_avatar_url,
         "last_login_at": current_user.last_login_at.isoformat() if current_user.last_login_at else None,
         "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
         "usage": usage_data["monthly"]  # We only need the monthly stats for the frontend store
     }
+
+@router.post("/mark-tour-seen")
+async def mark_tour_seen(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """Mark the search tour as seen so it never auto-fires again for this user."""
+    current_user.is_tour_seen = True
+    db.add(current_user)
+    await db.commit()
+    return {"ok": True}
+
 
 @router.post("/logout")
 async def logout(

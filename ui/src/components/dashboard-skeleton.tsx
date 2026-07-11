@@ -412,7 +412,7 @@ export function DashboardSkeleton() {
 				</div>
 
 				{/* --- Contact Us Section --- */}
-				<div className="col-span-2 lg:col-span-4 border-t border-border/40 bg-background">
+				<div id="contact-us" className="col-span-2 lg:col-span-4 border-t border-border/40 bg-background">
 					<ContactUs />
 				</div>
 

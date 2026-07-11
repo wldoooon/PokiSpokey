@@ -36,20 +36,12 @@ SECURITY_LIMITS: Dict[str, Dict[str, int]] = {
 
 
 # =============================================================================
-# FEATURE LIMITS (Tier-based, daily quotas)
+# FEATURE LIMITS (Tier-based)
 # 0 = blocked, -1 = unlimited
-# Search limits are daily approximations of monthly quotas:
-#   FREE=100/mo→~4/day, BASIC=500/mo→~17/day, PRO=2000/mo→~67/day
+# Note: search limits are managed monthly via usage_service.MONTHLY_SEARCH_LIMITS
 # =============================================================================
 
 FEATURE_LIMITS: Dict[str, Dict[RateLimitTier, int]] = {
-    "search": {
-        RateLimitTier.ANONYMOUS: 5,
-        RateLimitTier.FREE:      4,
-        RateLimitTier.BASIC:     17,
-        RateLimitTier.PRO:       67,
-        RateLimitTier.MAX:       -1,
-    },
     "ai_chat": {
         RateLimitTier.ANONYMOUS: 0,
         RateLimitTier.FREE:      15,

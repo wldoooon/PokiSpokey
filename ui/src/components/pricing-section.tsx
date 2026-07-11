@@ -10,6 +10,16 @@ import { useAuthStore } from "@/stores/auth-store";
 import { apiClient } from "@/lib/apiClient";
 import { toastManager } from "@/components/ui/toast";
 import { AuthDialog } from "@/components/auth-dialog";
+import { useSubscriptionQuery } from "@/lib/billingHooks";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
+	DialogFooter,
+} from "@/components/ui/dialog";
 
 type Plan = {
 	name: string;
@@ -86,6 +96,8 @@ export function PricingSection() {
 	const [frequency, setFrequency] = React.useState<"monthly" | "yearly">("monthly");
 	const user = useAuthStore((s) => s.user);
 	const userTier = user?.tier?.toLowerCase() ?? null;
+	const { data: sub } = useSubscriptionQuery();
+	const hasActiveSub = sub?.status === "active" || sub?.status === "on_hold";
 
 	return (
 		<div className="flex w-full flex-col items-center justify-center space-y-7 p-4">
@@ -102,7 +114,7 @@ export function PricingSection() {
 			<FrequencyToggle frequency={frequency} setFrequency={setFrequency} />
 			<div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
 				{plans.map((plan) => (
-					<PricingCard frequency={frequency} key={plan.name} plan={plan} userTier={userTier} />
+					<PricingCard frequency={frequency} key={plan.name} plan={plan} userTier={userTier} hasActiveSub={hasActiveSub} />
 				))}
 			</div>
 
@@ -132,6 +144,7 @@ type PricingCardProps = React.ComponentProps<"div"> & {
 	plan: Plan;
 	frequency?: FREQUENCY;
 	userTier?: string | null;
+	hasActiveSub?: boolean;
 };
 
 export function PricingCard({
@@ -139,17 +152,47 @@ export function PricingCard({
 	className,
 	frequency = "monthly",
 	userTier,
+	hasActiveSub = false,
 	...props
 }: PricingCardProps) {
 	const [loading, setLoading] = useState(false);
+	const [confirmOpen, setConfirmOpen] = useState(false);
 	const status = useAuthStore((s) => s.status);
+	const queryClient = useQueryClient();
 	const isCurrentPlan = userTier === plan.name.toLowerCase();
 	const isPaidPlan = !!plan.plan;
 	const isLoggedIn = status === "authenticated";
 
+	const handleUpgradeConfirmed = async () => {
+		setConfirmOpen(false);
+		setLoading(true);
+		try {
+			await apiClient.post("/billing/upgrade", { plan: plan.plan, billing_period: frequency });
+			toastManager.add({
+				title: "Plan updated!",
+				description: "Your subscription has been changed. It may take a moment to reflect.",
+				type: "success",
+			});
+			queryClient.invalidateQueries({ queryKey: ["billing", "subscription"] });
+			queryClient.invalidateQueries({ queryKey: ["me"] });
+		} catch (err: any) {
+			const msg = err?.response?.data?.detail ?? err?.message ?? "Could not change plan. Please try again.";
+			toastManager.add({ title: "Plan change failed", description: msg, type: "error" });
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	const handleCheckout = async () => {
 		if (!plan.plan) return;
 
+		// User already has an active subscription — show confirmation dialog first
+		if (hasActiveSub) {
+			setConfirmOpen(true);
+			return;
+		}
+
+		// No active subscription — open a fresh checkout session
 		setLoading(true);
 		try {
 			const { data } = await apiClient.post<{ checkout_url: string }>(
@@ -160,7 +203,6 @@ export function PricingCard({
 			// don't setLoading(false) — page is navigating away
 		} catch (err: any) {
 			const msg = err?.response?.data?.detail ?? err?.message ?? "Could not start checkout. Please try again.";
-			console.error("[checkout]", err?.response?.status, err?.response?.data);
 			toastManager.add({
 				title: "Checkout failed",
 				description: msg,
@@ -223,6 +265,8 @@ export function PricingCard({
 			>
 				{loading ? (
 					<Loader2 className="size-4 animate-spin" />
+				) : hasActiveSub ? (
+					`Upgrade to ${plan.name}`
 				) : (
 					plan.btn
 				)}
@@ -327,6 +371,29 @@ export function PricingCard({
 			>
 				{renderButton()}
 			</div>
+
+			<Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Upgrade to {plan.name}?</DialogTitle>
+						<DialogDescription>
+							You&apos;ll be charged a prorated amount for the rest of this billing period, then{" "}
+							<span className="font-semibold text-foreground">
+								${plan.price[frequency]}/month
+							</span>{" "}
+							going forward. This action cannot be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setConfirmOpen(false)}>
+							Cancel
+						</Button>
+						<Button onClick={handleUpgradeConfirmed} disabled={loading}>
+							{loading ? <Loader2 className="size-4 animate-spin" /> : "Confirm Upgrade"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

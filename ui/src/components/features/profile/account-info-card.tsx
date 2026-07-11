@@ -293,7 +293,7 @@ function DeleteAccountDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) setConfirmText(""); onOpenChange(v) }}>
-      <DialogContent className="rounded-2xl max-w-sm" showCloseButton={false}>
+      <DialogContent className="rounded-2xl max-w-sm">
         <div className="flex flex-col items-center gap-5 pt-2">
           <motion.div
             {...stagger(0)}
@@ -1051,10 +1051,11 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
   const searchCurrent = usage.search?.current ?? 0
   const searchLimit = usage.search?.limit ?? 0
 
-  const sparksUnlimited = sparksLimit === -1
+  // limit === -1 means unlimited, but if balance has actually hit 0 the user is out of credits
+  const sparksUnlimited = sparksLimit === -1 && sparksBalance !== 0
   const searchUnlimited = searchLimit === -1
   const sparksUsed = sparksUnlimited ? 0 : Math.max(0, sparksLimit - sparksBalance)
-  const sparksRemaining = sparksUnlimited ? Infinity : sparksBalance
+  const sparksRemaining = sparksUnlimited ? Infinity : Math.max(0, sparksBalance)
 
   const activePlanId = sub?.plan ?? "free"
   const currentPlan = PLANS.find(p => p.id === activePlanId) ?? PLANS[0]
@@ -1130,7 +1131,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
 
       {/* Cancel subscription dialog */}
       <Dialog open={cancelOpen} onOpenChange={(v) => { if (!v) { setCancelReasons([]); setCancelConfirm("") } setCancelOpen(v) }}>
-        <DialogContent className="rounded-2xl sm:max-w-[1100px] w-full p-0 overflow-hidden" showCloseButton={false}>
+        <DialogContent className="rounded-2xl sm:max-w-[1100px] w-full p-0 overflow-hidden">
           <div className="flex min-h-[600px]">
             {/* Left — image */}
             <div className="hidden md:block w-1/2 shrink-0 relative">

@@ -13,6 +13,7 @@ export type UserRead = {
   full_name?: string | null;
   is_active: boolean;
   is_email_verified: boolean;
+  is_tour_seen: boolean;
   tier: UserTier;
   oauth_provider?: string | null;
   oauth_avatar_url?: string | null;
