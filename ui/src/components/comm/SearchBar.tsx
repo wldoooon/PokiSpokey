@@ -249,8 +249,8 @@ export function SearchBar() {
             });
         } else {
             toastManager.add({
-                title: `Daily search limit reached (${limit}/today)`,
-                description: 'Resets at the end of the month — upgrade for more',
+                title: `Monthly search limit reached (${limit}/month)`,
+                description: 'Resets on the 1st of each month — upgrade for more',
                 type: 'warning',
             });
         }

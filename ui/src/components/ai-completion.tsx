@@ -25,6 +25,7 @@ import {
 import { Check } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { AuthDialog } from "@/components/auth-dialog";
+import { apiClient } from "@/lib/apiClient";
 
 interface SmartSuggestion {
     title: string;
@@ -178,6 +179,28 @@ export function AiCompletion({
                 if (scrollContentRef.current) {
                     scrollContentRef.current.scrollTop = scrollContentRef.current.scrollHeight;
                 }
+            }
+
+            // Refresh usage to reflect AI credits deducted server-side after stream
+            if (!controller.signal.aborted) {
+                apiClient.get("/api/v1/usage").then((res) => {
+                    const monthly = res.data?.monthly;
+                    if (monthly) {
+                        useUsageStore.getState().setAllUsage({
+                            search: {
+                                current:   monthly.search?.current   ?? 0,
+                                limit:     monthly.search?.limit     ?? 0,
+                                remaining: monthly.search?.remaining ?? 0,
+                            },
+                            ai_chat: {
+                                current:   monthly.ai_chat?.current   ?? 0,
+                                limit:     monthly.ai_chat?.limit     ?? 0,
+                                remaining: monthly.ai_chat?.remaining ?? 0,
+                                balance:   monthly.ai_chat?.balance   ?? 0,
+                            },
+                        });
+                    }
+                }).catch(() => {});
             }
         } catch (err: any) {
             if (err?.name === "AbortError") return; // User stopped — not an error state
