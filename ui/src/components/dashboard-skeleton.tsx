@@ -26,16 +26,22 @@ const carouselItems = [
 		id: "1",
 		image: "/moviesPosters.png",
 		title: "Movies Collection",
+		description: "Hear native speakers in blockbusters, indie films, and classic cinema.",
+		tags: ["Native Speech", "Real Context", "100K+ Clips"],
 	},
 	{
 		id: "2",
 		image: "/PodcastCollection.png",
 		title: "Podcast Series",
+		description: "Learn conversational language from top podcasters across every genre.",
+		tags: ["Conversational", "All Levels", "New Daily"],
 	},
 	{
 		id: "3",
 		image: "/Cartoon_Picture.jpg",
 		title: "Animation Studio",
+		description: "Fun, clear pronunciation from beloved animated shows and cartoons.",
+		tags: ["Clear Speech", "Beginner Friendly", "Family Content"],
 	},
 ];
 

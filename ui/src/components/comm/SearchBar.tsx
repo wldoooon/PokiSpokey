@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, X, ArrowRight, ChevronDown, Check, Clock, Lock, Video, Tv, Mic, Music, LayoutGrid, HelpCircle } from 'lucide-react';
+import { Search, X, ArrowRight, ChevronDown, Check, Clock, Lock, Tv, LayoutGrid, HelpCircle, Newspaper, Clapperboard } from 'lucide-react';
+import { getCategoriesForLanguage } from '@/lib/categories';
 import { startTour } from '@/components/app-tour';
 import { cn } from '@/lib/utils';
 import { useRouter, usePathname } from 'next/navigation';
@@ -28,14 +29,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import TextType from '@/components/TextType';
 import { useDatamuse } from '@/hooks/useDatamuse';
 
-// Fix #12: DEFAULT_CATEGORIES label/value consistency ('Talks' was mislabeled 'Music')
-const DEFAULT_CATEGORIES = [
-    { value: 'All', label: 'All', renderIcon: (cls: string) => <LayoutGrid className={cls} /> },
-    { value: 'Movies', label: 'Movies', renderIcon: (cls: string) => <Video className={cls} /> },
-    { value: 'Cartoons', label: 'TV Shows', renderIcon: (cls: string) => <Tv className={cls} /> },
-    { value: 'Podcasts', label: 'Podcasts', renderIcon: (cls: string) => <Mic className={cls} /> },
-    { value: 'Talks', label: 'Talks', renderIcon: (cls: string) => <Music className={cls} /> },
-];
 
 const PodcastIcon = ({ className }: { className?: string }) => (
     <svg className={className} role="img" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -51,12 +44,20 @@ const MoviesIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-const ENGLISH_CATEGORIES = [
-    { value: 'All', label: 'All', renderIcon: (cls: string) => <LayoutGrid className={cls} /> },
-    { value: 'Movies', label: 'Movies & TV Shows', renderIcon: (cls: string) => <MoviesIcon className={cls} /> },
-    { value: 'Shows', label: 'Shows', renderIcon: (cls: string) => <Tv className={cls} /> },
-    { value: 'Podcasts & Talks', label: 'Podcasts & Talks', renderIcon: (cls: string) => <PodcastIcon className={cls} /> },
-];
+type RenderableCategory = { value: string; label: string; renderIcon: (cls: string) => React.ReactNode }
+
+const CATEGORY_ICONS: Record<string, (cls: string) => React.ReactNode> = {
+    All:      (cls) => <LayoutGrid className={cls} />,
+    Movies:   (cls) => <MoviesIcon className={cls} />,
+    Shows:    (cls) => <Tv className={cls} />,
+    Podcasts: (cls) => <PodcastIcon className={cls} />,
+    News:     (cls) => <Newspaper className={cls} />,
+    Cartoons: (cls) => <Clapperboard className={cls} />,
+};
+
+function withIcons(cats: { value: string; label: string }[]): RenderableCategory[] {
+    return cats.map(c => ({ ...c, renderIcon: CATEGORY_ICONS[c.value] ?? ((cls) => <LayoutGrid className={cls} />) }));
+}
 
 // Languages with flags
 const LANGUAGES = [
@@ -111,8 +112,7 @@ export function SearchBar() {
 
     const MAX_SEARCH_LENGTH = 60;
 
-    // Fix #10: Only fetch Datamuse suggestions for English (it's an English-only API)
-    const { suggestions, isLoading } = useDatamuse(selectedLanguage === 'English' ? query : '');
+    const { suggestions, isLoading } = useDatamuse(query, selectedLanguage);
     const { hasAccess, remaining, limit, isUnlimited, isLoaded } = useEntitlements('search');
     const isAnonymous = useAuthStore((s) => s.status) !== 'authenticated';
 
@@ -183,7 +183,7 @@ export function SearchBar() {
     // Order: suggestions first (English only), then recent searches
     const navItems = useMemo(() => {
         const items: Array<{ type: 'suggestion' | 'recent'; value: string }> = [];
-        if (selectedLanguage === 'English' && query.length >= 2 && !isLoading) {
+        if (query.length >= 2 && !isLoading) {
             suggestions.forEach(s => items.push({ type: 'suggestion', value: s.word }));
         }
         recentSearches.slice(0, 3).forEach(r => items.push({ type: 'recent', value: r }));
@@ -191,9 +191,7 @@ export function SearchBar() {
     }, [suggestions, recentSearches, query.length, isLoading, selectedLanguage]);
 
     // Number of suggestion entries in navItems (for highlight offset calculation)
-    const suggCountInNav = selectedLanguage === 'English' && query.length >= 2 && !isLoading
-        ? suggestions.length
-        : 0;
+    const suggCountInNav = query.length >= 2 && !isLoading ? suggestions.length : 0;
 
     const toggleCategory = (cat: string) => {
         if (cat === 'All') {
@@ -337,7 +335,7 @@ export function SearchBar() {
     };
 
     // Whether the suggestions panel has content to show
-    const hasSuggestions = selectedLanguage === 'English' && query.length >= 2 && (suggestions.length > 0 || isLoading);
+    const hasSuggestions = query.length >= 2 && (suggestions.length > 0 || isLoading);
     const panelVisible = showRecent && !isSearching && (recentSearches.length > 0 || hasSuggestions);
 
     return (
@@ -382,7 +380,7 @@ export function SearchBar() {
                                     Search in
                                 </p>
                                 <div className="flex flex-col gap-0.5">
-                                    {(selectedLanguage === 'English' ? ENGLISH_CATEGORIES : DEFAULT_CATEGORIES).map((cat) => {
+                                    {withIcons(getCategoriesForLanguage(selectedLanguage)).map((cat) => {
                                         const selected = isCategorySelected(cat.value);
                                         return (
                                             <button
@@ -581,8 +579,8 @@ export function SearchBar() {
             {panelVisible && (
                 <Card className="absolute top-full left-0 right-0 mt-0 rounded-t-none rounded-b-2xl shadow-xl border-t-0 animate-in fade-in-0 zoom-in-95 z-50 bg-background/95 backdrop-blur-md overflow-hidden">
                     <CardContent className="p-0">
-                        {/* 1. Autocomplete Suggestions (English only) */}
-                        {selectedLanguage === 'English' && query.length >= 2 && (
+                        {/* 1. Autocomplete Suggestions */}
+                        {query.length >= 2 && (
                             <div className="p-1">
                                 {isLoading ? (
                                     <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
@@ -616,7 +614,7 @@ export function SearchBar() {
                         )}
 
                         {/* Separator if both sections have content */}
-                        {selectedLanguage === 'English' && query.length >= 2 && suggestions.length > 0 && recentSearches.length > 0 && (
+                        {query.length >= 2 && suggestions.length > 0 && recentSearches.length > 0 && (
                             <div className="h-px bg-border/50 mx-2 my-1" />
                         )}
 

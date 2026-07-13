@@ -140,7 +140,6 @@ async def search(
         hits.append(search_hit)
 
     total = raw_results.get("hits", {}).get("total", {}).get("value", 0)
-
     aggregations = raw_results.get("aggregations", {})
     return SearchResponse(total=total, hits=hits, aggregations=aggregations)
 
