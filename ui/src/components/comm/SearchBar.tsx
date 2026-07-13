@@ -341,7 +341,7 @@ export function SearchBar() {
     const panelVisible = showRecent && !isSearching && (recentSearches.length > 0 || hasSuggestions);
 
     return (
-        <div id="tour-search" className="w-full max-w-4xl flex items-center gap-4 relative z-50" ref={containerRef}>
+        <div id="tour-search" className="w-full max-w-4xl flex items-center gap-2 md:gap-4 relative z-50" ref={containerRef}>
             <div className="flex-1">
                 <div className={cn(
                     "search-animated-border group relative transition-all duration-300",
@@ -572,7 +572,7 @@ export function SearchBar() {
             <button
                 onClick={startTour}
                 title="How it works"
-                className="h-9 w-9 rounded-full border border-border shadow-sm bg-card flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                className="hidden sm:flex h-9 w-9 rounded-full border border-border shadow-sm bg-card items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
             >
                 <HelpCircle className="h-4 w-4" />
             </button>

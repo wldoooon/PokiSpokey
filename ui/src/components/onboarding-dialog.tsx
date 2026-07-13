@@ -12,7 +12,7 @@ import { AuthDialog } from "@/components/auth-dialog"
 import { startTour } from "@/components/app-tour"
 
 const WELCOME_KEY = "vl_welcome_done"
-const DEMO_VIDEO_SRC = "https://me78yeazv3ihsfxh.public.blob.vercel-storage.com/how%20it%20work.mp4"
+const DEMO_VIDEO_SRC = "/How2.mp4"
 const STEPS = ["welcome", "how", "tour", "start"] as const
 const SI_LABELS = ["Welcome", "In Action", "Guided Tour", "Ready"]
 
@@ -85,7 +85,7 @@ function StepIndicator({ step, open }: { step: number; open: boolean }) {
   }, [step])
 
   return (
-    <div ref={ref} className="px-8 pt-5 pb-5 border-b border-border/30">
+    <div ref={ref} className="px-4 sm:px-8 pt-4 sm:pt-5 pb-4 sm:pb-5 border-b border-border/30">
       {/* Row 1: circles + animated lines */}
       <div className="flex items-center">
         {SI_LABELS.map((_, i) => (
@@ -149,11 +149,11 @@ function StepWelcome({ theme: _ }: { theme?: string }) {
   }, { scope: containerRef })
 
   return (
-    <div ref={containerRef} className="flex flex-col justify-center h-full gap-5">
+    <div ref={containerRef} className="flex flex-col justify-center h-full gap-3 sm:gap-5">
       {/* Logo + Headline inline */}
-      <div className="flex items-center gap-4">
-        <img src="/main_logo.png" alt="PokiSpokey" className="w-logo w-30 h-30 object-contain shrink-0" />
-        <h2 className="text-4xl font-extrabold tracking-tight text-foreground leading-tight flex flex-wrap gap-x-[0.27em]">
+      <div className="flex items-center gap-3 sm:gap-4">
+        <img src="/main_logo.png" alt="PokiSpokey" className="w-logo w-16 h-16 sm:w-24 sm:h-24 object-contain shrink-0" />
+        <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground leading-tight flex flex-wrap gap-x-[0.27em]">
           {HEADLINE_WORDS.map((word, i) => (
             <span key={i} className="w-word inline-block">{word}</span>
           ))}
@@ -161,15 +161,15 @@ function StepWelcome({ theme: _ }: { theme?: string }) {
       </div>
 
       {/* Welcome title */}
-      <p className="w-desc text-xl font-bold text-foreground">
+      <p className="w-desc text-base sm:text-xl font-bold text-foreground">
         Welcome To <span className="text-primary">PokiSpokey</span>
       </p>
 
       {/* Description */}
-      <p className="w-desc text-base text-muted-foreground leading-relaxed">
+      <p className="w-desc text-sm sm:text-base text-muted-foreground leading-relaxed">
         Just type any word and we'll find you the exact moment it's used in a real movie, podcast, or TV show so you can hear how people actually say it, not how a textbook tells you to.
       </p>
-      <p className="w-desc text-base text-muted-foreground leading-relaxed">
+      <p className="w-desc text-sm sm:text-base text-muted-foreground leading-relaxed hidden sm:block">
         No boring exercises. No robot voices. Just real clips, real people, real language.
       </p>
     </div>
@@ -250,22 +250,22 @@ function StepHow({ active, onRegisterExit }: { active: boolean; onRegisterExit: 
 
 function StepTour() {
   return (
-    <div className="grid grid-cols-5 gap-8 h-full">
+    <div className="flex flex-col sm:grid sm:grid-cols-5 gap-4 sm:gap-8 h-full">
       {/* Left: explanation */}
-      <div className="col-span-3 flex flex-col justify-center gap-4">
-        <h2 className="text-2xl font-extrabold tracking-tight text-foreground leading-tight">
+      <div className="sm:col-span-3 flex flex-col justify-center gap-3 sm:gap-4">
+        <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground leading-tight">
           Not sure what something does?
         </h2>
-        <p className="text-base text-muted-foreground leading-relaxed">
+        <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
           Anywhere you see a <span className="inline-flex items-center justify-center h-5 w-5 rounded-full border border-border text-[11px] font-bold text-foreground align-middle mx-0.5">?</span> icon on the page, click it. It will show you exactly what that part of the app does, in plain words, no guessing needed.
         </p>
-        <p className="text-base text-muted-foreground leading-relaxed">
+        <p className="text-sm sm:text-base text-muted-foreground leading-relaxed hidden sm:block">
           You can click them as many times as you want, whenever something feels unclear.
         </p>
       </div>
 
       {/* Right: single search bar skeleton with ? icon */}
-      <div className="col-span-2 flex items-center justify-center">
+      <div className="sm:col-span-2 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 w-full">
           <div className="w-full rounded-xl border border-border/60 bg-card shadow-sm px-3 py-3 flex items-center gap-2">
             <div className="h-2 w-3 rounded bg-muted/40 shrink-0" />
@@ -289,7 +289,7 @@ function StepStart({ onGuest, onSignUp }: { onGuest: () => void; onSignUp: () =>
         <p className="text-sm text-muted-foreground mt-1">You can always create an account later.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {/* Guest card */}
         <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-5">
           <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center">
@@ -390,14 +390,14 @@ export function OnboardingDialog() {
         showCloseButton={false}
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
-        className="sm:max-w-4xl p-0 overflow-hidden rounded-2xl gap-0 border-border/60"
+        className="w-[95vw] sm:max-w-4xl p-0 overflow-hidden rounded-2xl gap-0 border-border/60 max-h-[92vh] overflow-y-auto"
       >
 
         <DialogTitle className="sr-only">Welcome to PokiSpokey</DialogTitle>
         <StepIndicator step={step} open={open} />
 
         {/* Slide area */}
-        <div className="relative overflow-hidden" style={{ minHeight: step === 1 ? 560 : 340 }}>
+        <div className="relative overflow-hidden" style={{ minHeight: step === 1 ? "min(560px, 45vh)" : "min(340px, 35vh)" }}>
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={step}
@@ -406,7 +406,7 @@ export function OnboardingDialog() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: direction * -340, opacity: 0 }}
               transition={{ duration: 0.22, ease: "easeInOut" }}
-              className="absolute inset-0 px-8 pt-4 pb-3 flex flex-col"
+              className="absolute inset-0 px-4 sm:px-8 pt-4 pb-3 flex flex-col"
             >
               {step === 0 && <StepWelcome theme={resolvedTheme} />}
               {step === 1 && <StepHow active={open && step === 1} onRegisterExit={fn => { howExitRef.current = fn }} />}
@@ -417,7 +417,7 @@ export function OnboardingDialog() {
         </div>
 
         {/* Footer */}
-        <div className="px-8 pb-6 pt-3 flex items-center justify-between border-t border-border/30">
+        <div className="px-4 sm:px-8 pb-5 sm:pb-6 pt-3 flex items-center justify-between border-t border-border/30">
           {step > 0 ? (
             <Button variant="ghost" size="sm" onClick={() => goTo(step - 1)} className="text-muted-foreground">
               ← Back
