@@ -20,7 +20,8 @@ const categories = [
     id: 'movies',
     label: 'Movies',
     count: '142k',
-    description: 'Blockbuster contexts',
+    description: 'Real language from Hollywood blockbusters',
+    tags: ['Hollywood Hits', 'Award Winners'],
     icon: Film,
     image: '/Kentucky Theater Summer Classics.png',
   },
@@ -28,7 +29,8 @@ const categories = [
     id: 'cartoons',
     label: 'Cartoons',
     count: '85k',
-    description: 'Animated learning',
+    description: 'Fun and expressive animated learning',
+    tags: ['Animated Series', 'Voice Acting'],
     icon: Tv,
     image: '/we bare bears.png',
   },
@@ -36,7 +38,8 @@ const categories = [
     id: 'interviews',
     label: 'Interviews',
     count: '98k',
-    description: 'Q&A mastery',
+    description: 'Authentic conversations with native speakers',
+    tags: ['Real Talk', 'Native Speakers'],
     icon: Users,
     image: '/PodcastCollection.png',
   },
@@ -44,23 +47,26 @@ const categories = [
     id: 'talks',
     label: 'Talks',
     count: '120k',
-    description: 'Inspiring speeches',
+    description: 'Learn from the world\'s best speakers',
+    tags: ['Expert Speakers', 'TED Style'],
     icon: MonitorPlay,
     image: '/These Abstract Paper Profiles Have Something to Say about the World.png',
   },
   {
     id: 'talks2',
-    label: 'Talks',
+    label: 'Podcasts',
     count: '120k',
-    description: 'Inspiring speeches',
+    description: 'Casual speech from popular podcast hosts',
+    tags: ['Casual Speech', 'Long Form'],
     icon: MonitorPlay,
     image: '/talk.png',
   },
   {
     id: 'moves2',
-    label: 'Movies',
+    label: 'TV Shows',
     count: '65k',
-    description: 'All Movies Genres',
+    description: 'Everyday dialogue from hit TV series',
+    tags: ['Drama', 'Comedy'],
     icon: Video,
     image: '/moviesPosters.png',
   },
@@ -356,22 +362,22 @@ export function Hero() {
                             sizes="(max-width: 768px) 100vw, 400px"
                             priority={isActive}
                           />
-                          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-background/90" />
-                        </div>
-
-                        {/* Top Badge: Clip Count */}
-                        <div className="absolute top-4 right-4 bg-muted/80 border border-border/20 px-3 py-1.5 rounded-full flex items-center space-x-1.5 shadow-lg">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                          <span className="text-xs font-bold text-foreground tracking-wide">{cat.count} Clips</span>
+                          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/80" />
                         </div>
 
                         {/* Bottom Content */}
-                        <div className="absolute bottom-0 left-0 right-0 p-7">
-                          <div className="w-13 h-13 bg-black/30 rounded-2xl flex items-center justify-center mb-4 border border-white/10 text-white shadow-lg">
-                            <cat.icon className="w-6 h-6" />
+                        <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7">
+                          {/* Checkmark tags */}
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {cat.tags.map((tag) => (
+                              <span key={tag} className="flex items-center gap-1 text-[11px] font-semibold text-white bg-white/15 backdrop-blur-sm border border-white/20 px-2.5 py-1 rounded-full">
+                                <svg className="w-3 h-3 shrink-0" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                {tag}
+                              </span>
+                            ))}
                           </div>
-                          <h3 className="text-2xl font-bold text-white mb-1">{cat.label}</h3>
-                          <p className="text-sm text-slate-300 font-medium">{cat.description}</p>
+                          <h3 className={cn("text-3xl sm:text-4xl font-black text-white uppercase tracking-tight mb-1.5", carterOne.className)}>{cat.label}</h3>
+                          <p className="text-sm text-white/70 font-medium leading-snug">{cat.description}</p>
                         </div>
 
                         {/* Active border glow */}
@@ -384,34 +390,35 @@ export function Hero() {
                 })}
               </div>
 
-              {/* Controls Row: prev · dots · next */}
-              <div className="flex items-center gap-4 relative z-10">
-                <button
-                  onClick={() => setActiveCategory((prev) => (prev - 1 + categories.length) % categories.length)}
-                  className="w-8 h-8 rounded-full border border-border/60 bg-background/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all active:scale-90"
-                  aria-label="Previous"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-
-                <div className="flex items-center gap-2">
-                  {categories.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveCategory(i)}
-                      className={`rounded-full transition-all duration-300 ${i === activeCategory ? 'w-5 h-2 bg-primary' : 'w-2 h-2 bg-border hover:bg-muted-foreground'}`}
-                      aria-label={`Go to slide ${i + 1}`}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => setActiveCategory((prev) => (prev + 1) % categories.length)}
-                  className="w-8 h-8 rounded-full border border-border/60 bg-background/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all active:scale-90"
-                  aria-label="Next"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+              {/* Labeled progress bar navigation */}
+              <div className="flex items-end gap-3 w-full px-1 relative z-10">
+                {categories.map((cat, i) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(i)}
+                    className="flex flex-col gap-1.5 flex-1 text-left group min-w-0"
+                  >
+                    <div className="h-[2px] w-full bg-border/60 rounded-full overflow-hidden">
+                      {i === activeCategory ? (
+                        <div
+                          key={activeCategory}
+                          className="h-full bg-foreground rounded-full"
+                          style={{ animation: isPaused ? 'none' : 'progress-fill 5s linear forwards' }}
+                        />
+                      ) : i < activeCategory ? (
+                        <div className="h-full bg-foreground/40 rounded-full w-full" />
+                      ) : null}
+                    </div>
+                    <span className={cn(
+                      "text-[10px] sm:text-[11px] truncate transition-colors duration-200",
+                      i === activeCategory
+                        ? `font-bold text-foreground ${carterOne.className}`
+                        : "font-medium text-muted-foreground group-hover:text-foreground/70"
+                    )}>
+                      {cat.label}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           </AnimatedContent>
