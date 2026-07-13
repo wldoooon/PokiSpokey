@@ -224,7 +224,7 @@ export default function RoutedSearchPage() {
             <div className={`flex flex-col overflow-y-auto ${mobileTab !== "player" ? "hidden xl:flex" : ""}`}>
               {playlist.length === 0 && !isLoading && !isFetching ? (
                 <div className="p-4 sm:p-6">
-                  <NoResults query={q} />
+                  <NoResults query={q} activeCategory={categoryForContext} language={languageParam} />
                 </div>
               ) : (
                 <div className="flex flex-col relative w-full">
