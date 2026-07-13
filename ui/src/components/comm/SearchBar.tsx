@@ -112,7 +112,7 @@ export function SearchBar() {
 
     const MAX_SEARCH_LENGTH = 60;
 
-    // Fix #10: Only fetch Datamuse suggestions for English (it's an English-only API)
+    // Datamuse is English-only — pass empty string for other languages to skip fetch
     const { suggestions, isLoading } = useDatamuse(selectedLanguage === 'English' ? query : '');
     const { hasAccess, remaining, limit, isUnlimited, isLoaded } = useEntitlements('search');
     const isAnonymous = useAuthStore((s) => s.status) !== 'authenticated';
@@ -582,7 +582,7 @@ export function SearchBar() {
             {panelVisible && (
                 <Card className="absolute top-full left-0 right-0 mt-0 rounded-t-none rounded-b-2xl shadow-xl border-t-0 animate-in fade-in-0 zoom-in-95 z-50 bg-background/95 backdrop-blur-md overflow-hidden">
                     <CardContent className="p-0">
-                        {/* 1. Autocomplete Suggestions (English only) */}
+                        {/* 1. Autocomplete Suggestions (English only — Datamuse API) */}
                         {selectedLanguage === 'English' && query.length >= 2 && (
                             <div className="p-1">
                                 {isLoading ? (
