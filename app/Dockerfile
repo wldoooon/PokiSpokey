@@ -140,7 +140,7 @@ EXPOSE 5001
 # If it fails 3 times in a row, the container is marked "unhealthy" and
 # can be auto-restarted (depending on your restart policy).
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:5001/docs || exit 1
+    CMD curl -f http://localhost:5001/health || exit 1
 
 # Start the server
 # ────────────────

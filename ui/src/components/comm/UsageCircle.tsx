@@ -133,7 +133,7 @@ export function UsageCircle({
                         <div className="flex items-center gap-1.5">
                             <Flame className="w-3.5 h-3.5 text-muted-foreground" />
                             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                Daily Usage
+                                Monthly Usage
                             </span>
                         </div>
                         <span
@@ -210,7 +210,7 @@ export function UsageCircle({
                         style={{ background: ratioToBg(ratio, 0.08) }}
                     >
                         <Clock className="w-3.5 h-3.5 shrink-0" />
-                        <span>Resets daily at <span className="font-semibold">midnight</span></span>
+                        <span>Resets on the <span className="font-semibold">1st of each month</span></span>
                     </div>
 
                     {/* ── CTA ── */}
@@ -220,7 +220,7 @@ export function UsageCircle({
                                 className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-white text-xs font-bold transition-all hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
                                 style={{ background: isFull ? "#ef4444" : strokeColor }}
                             >
-                                <UserPlus className="w-3.5 h-3.5" /> Sign up for 50/day
+                                <UserPlus className="w-3.5 h-3.5" /> Sign up for 50/month
                             </button>
                         </AuthDialog>
                     ) : (

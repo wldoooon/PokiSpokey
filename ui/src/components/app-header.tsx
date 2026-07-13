@@ -40,25 +40,23 @@ export function AppHeader() {
 	}, [theme, setTheme, startTransition]);
 
 	return (
-		<header
-			className={cn(
-				"pxx-4 mb-6 flex items-center justify-between gap-2 md:px-2 relative z-50"
-			)}
-		>
-			<div className="flex items-center gap-3">
+		<header className="mb-6 flex items-center justify-between gap-2 md:px-2 relative z-50">
+			<div className="flex items-center gap-3 shrink-0">
 				<CustomSidebarTrigger />
 				<Separator
-					className="mr-2 h-4 data-[orientation=vertical]:self-center"
+					className="mr-2 h-4 data-[orientation=vertical]:self-center hidden md:block"
 					orientation="vertical"
 				/>
-				<AppBreadcrumbs page={activeItem} />
+				<div className="hidden md:block">
+					<AppBreadcrumbs page={activeItem} />
+				</div>
 			</div>
 
-			<div className="flex-1 flex justify-center px-4 max-w-4xl">
+			<div className="flex-1 min-w-0 flex justify-center px-2 md:px-4">
 				<SearchBar />
 			</div>
 
-			<div className="flex items-center gap-3">
+			<div className="hidden sm:flex items-center gap-1 md:gap-3 shrink-0">
 				{mounted && (
 					<ThemeToggleButton
 						theme={theme as 'light' | 'dark'}
@@ -67,13 +65,13 @@ export function AppHeader() {
 					/>
 				)}
 				<Separator
-					className="h-4 data-[orientation=vertical]:self-center"
+					className="h-4 data-[orientation=vertical]:self-center hidden md:block"
 					orientation="vertical"
 				/>
 				{authStatus === "guest" ? (
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-1 md:gap-2">
 						<AuthDialog defaultTab="login">
-							<Button variant="ghost" size="sm" className="font-medium">
+							<Button variant="ghost" size="sm" className="font-medium hidden sm:flex">
 								Sign in
 							</Button>
 						</AuthDialog>
