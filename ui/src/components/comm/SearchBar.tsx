@@ -112,8 +112,7 @@ export function SearchBar() {
 
     const MAX_SEARCH_LENGTH = 60;
 
-    // Datamuse is English-only — pass empty string for other languages to skip fetch
-    const { suggestions, isLoading } = useDatamuse(selectedLanguage === 'English' ? query : '');
+    const { suggestions, isLoading } = useDatamuse(query, selectedLanguage);
     const { hasAccess, remaining, limit, isUnlimited, isLoaded } = useEntitlements('search');
     const isAnonymous = useAuthStore((s) => s.status) !== 'authenticated';
 
@@ -184,7 +183,7 @@ export function SearchBar() {
     // Order: suggestions first (English only), then recent searches
     const navItems = useMemo(() => {
         const items: Array<{ type: 'suggestion' | 'recent'; value: string }> = [];
-        if (selectedLanguage === 'English' && query.length >= 2 && !isLoading) {
+        if (query.length >= 2 && !isLoading) {
             suggestions.forEach(s => items.push({ type: 'suggestion', value: s.word }));
         }
         recentSearches.slice(0, 3).forEach(r => items.push({ type: 'recent', value: r }));
@@ -192,9 +191,7 @@ export function SearchBar() {
     }, [suggestions, recentSearches, query.length, isLoading, selectedLanguage]);
 
     // Number of suggestion entries in navItems (for highlight offset calculation)
-    const suggCountInNav = selectedLanguage === 'English' && query.length >= 2 && !isLoading
-        ? suggestions.length
-        : 0;
+    const suggCountInNav = query.length >= 2 && !isLoading ? suggestions.length : 0;
 
     const toggleCategory = (cat: string) => {
         if (cat === 'All') {
@@ -338,7 +335,7 @@ export function SearchBar() {
     };
 
     // Whether the suggestions panel has content to show
-    const hasSuggestions = selectedLanguage === 'English' && query.length >= 2 && (suggestions.length > 0 || isLoading);
+    const hasSuggestions = query.length >= 2 && (suggestions.length > 0 || isLoading);
     const panelVisible = showRecent && !isSearching && (recentSearches.length > 0 || hasSuggestions);
 
     return (
@@ -582,8 +579,8 @@ export function SearchBar() {
             {panelVisible && (
                 <Card className="absolute top-full left-0 right-0 mt-0 rounded-t-none rounded-b-2xl shadow-xl border-t-0 animate-in fade-in-0 zoom-in-95 z-50 bg-background/95 backdrop-blur-md overflow-hidden">
                     <CardContent className="p-0">
-                        {/* 1. Autocomplete Suggestions (English only — Datamuse API) */}
-                        {selectedLanguage === 'English' && query.length >= 2 && (
+                        {/* 1. Autocomplete Suggestions */}
+                        {query.length >= 2 && (
                             <div className="p-1">
                                 {isLoading ? (
                                     <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
@@ -617,7 +614,7 @@ export function SearchBar() {
                         )}
 
                         {/* Separator if both sections have content */}
-                        {selectedLanguage === 'English' && query.length >= 2 && suggestions.length > 0 && recentSearches.length > 0 && (
+                        {query.length >= 2 && suggestions.length > 0 && recentSearches.length > 0 && (
                             <div className="h-px bg-border/50 mx-2 my-1" />
                         )}
 
