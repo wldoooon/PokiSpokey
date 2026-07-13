@@ -38,7 +38,6 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
     const router = useRouter()
     const { suggestions } = useLanguageTool(query, language)
     const containerRef = useRef<HTMLDivElement>(null)
-    const iconRef = useRef<HTMLDivElement>(null)
     const titleRef = useRef<HTMLHeadingElement>(null)
     const subRef = useRef<HTMLParagraphElement>(null)
     const chipsRef = useRef<HTMLDivElement>(null)
@@ -59,13 +58,6 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
             tl.fromTo(containerRef.current,
                 { opacity: 0, y: 24 },
                 { opacity: 1, y: 0, duration: 0.5 }
-            )
-
-            // Icon bounce in
-            tl.fromTo(iconRef.current,
-                { opacity: 0, scale: 0.5, rotation: -15 },
-                { opacity: 1, scale: 1, rotation: 0, duration: 0.55, ease: "back.out(1.6)" },
-                "-=0.25"
             )
 
             // Title
@@ -114,17 +106,6 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
                 )
             }
 
-            // Idle float — only for the generic "no results" state
-            if (!hasCategory) {
-                gsap.to(iconRef.current, {
-                    y: -6,
-                    duration: 2.2,
-                    repeat: -1,
-                    yoyo: true,
-                    ease: "sine.inOut",
-                    delay: 0.8,
-                })
-            }
         })
 
         return () => ctx.revert()
@@ -162,21 +143,6 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
 
                     <div className="relative p-10 sm:p-16 text-center flex flex-col items-center gap-5">
 
-                        {/* Icon */}
-                        <div
-                            ref={iconRef}
-                            className={`w-20 h-20 rounded-2xl flex items-center justify-center ${
-                                hasCategory
-                                    ? ""
-                                    : "bg-primary/10 shadow-lg shadow-primary/10"
-                            }`}
-                        >
-                            {hasCategory
-                                ? <Filter className="w-9 h-9 text-orange-500" />
-                                : <Search className="w-9 h-9 text-primary" />
-                            }
-                        </div>
-
                         {/* Title */}
                         <h2
                             ref={titleRef}
@@ -184,7 +150,7 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
                         >
                             {hasCategory
                                 ? <>No clips in <span className="text-orange-500">{activeCategory}</span></>
-                                : "No clips found"
+                                : <>No clips for <span className="text-orange-500">"{query}"</span></>
                             }
                         </h2>
 
@@ -204,8 +170,7 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
                                 </>
                             ) : (
                                 <>
-                                    No exact matches for{" "}
-                                    <span className="font-bold text-foreground underline decoration-primary/30 underline-offset-4">"{query}"</span>.{" "}
+                                    We couldn't find any clips matching this word.{" "}
                                     Check your spelling or try another word.
                                 </>
                             )}
@@ -222,10 +187,10 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
                                         <button
                                             key={word}
                                             onClick={() => goSuggestion(word)}
-                                            className="group/sug inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary/8 hover:bg-primary/15 border border-primary/20 hover:border-primary/40 text-sm font-semibold text-primary transition-all duration-200"
+                                            className="relative text-base font-bold text-orange-500 hover:text-orange-400 cursor-pointer transition-colors duration-150 group/sug"
                                         >
-                                            <Search className="w-3 h-3 opacity-60" />
                                             {word}
+                                            <span className="absolute left-0 -bottom-0.5 h-[2px] w-0 bg-orange-400 group-hover/sug:w-full transition-all duration-300 ease-out rounded-full" />
                                         </button>
                                     ))}
                                 </div>
