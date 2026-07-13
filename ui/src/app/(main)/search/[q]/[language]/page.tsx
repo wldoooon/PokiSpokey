@@ -109,6 +109,7 @@ export default function RoutedSearchPage() {
     return data.pages[0].aggregations || {}
   }, [data])
 
+
   // Pre-fetch next page when nearing the end of the playlist
   useEffect(() => {
     if (!hasNextPage || isFetchingNextPage) return

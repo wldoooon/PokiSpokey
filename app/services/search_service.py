@@ -58,7 +58,7 @@ class SearchService:
             
         table_name = self._resolve_table(language)
         offset = (page - 1) * limit
-        return await self._search_all_categories(safe_q, table_name, limit=limit, offset=offset, sub_category=sub_category)
+        return await self._search_all_categories(safe_q, table_name, limit=limit, offset=offset, category=category, sub_category=sub_category)
 
     def _resolve_table(self, language: str) -> str:
         if not language:
@@ -71,9 +71,15 @@ class SearchService:
             return self.table_name
         return f"{lang}_dataset"
 
-    async def _search_all_categories(self, q: str, table_name: str, limit: int, offset: int = 0, sub_category: Optional[str] = None) -> dict:
+    async def _search_all_categories(self, q: str, table_name: str, limit: int, offset: int = 0, category: Optional[str] = None, sub_category: Optional[str] = None) -> dict:
         config = self._LANGUAGE_CONFIG.get(table_name)
         categories = config["map"] if config else {"Podcasts": 1}
+
+        if category:
+            requested = {c.strip() for c in category.split(",")}
+            categories = {k: v for k, v in categories.items() if k in requested}
+            if not categories:
+                return {"hits": {"hits": [], "total": {"value": 0}}, "aggregations": {}}
 
         # Fetch enough per category to cover pagination after merging
         per_cat_limit = min(limit + offset, self.CUTOFF)

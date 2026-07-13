@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { gsap } from "gsap"
 import { Search, Filter, ArrowRight, LayoutGrid, Tv, Newspaper, Clapperboard } from "lucide-react"
 import { getCategoriesForLanguage } from "@/lib/categories"
+import { useLanguageTool } from "@/hooks/useLanguageTool"
 
 const PodcastIcon = ({ className }: { className?: string }) => (
     <svg className={className} role="img" fill="currentColor" viewBox="0 0 24 24">
@@ -35,12 +36,14 @@ interface NoResultsProps {
 
 export function NoResults({ query, activeCategory, language = "english" }: NoResultsProps) {
     const router = useRouter()
+    const { suggestions } = useLanguageTool(query, language)
     const containerRef = useRef<HTMLDivElement>(null)
     const iconRef = useRef<HTMLDivElement>(null)
     const titleRef = useRef<HTMLHeadingElement>(null)
     const subRef = useRef<HTMLParagraphElement>(null)
     const chipsRef = useRef<HTMLDivElement>(null)
     const allLinkRef = useRef<HTMLButtonElement>(null)
+    const suggestionsRef = useRef<HTMLDivElement>(null)
 
     const hasCategory = !!activeCategory && activeCategory !== "All"
     const allCategories = getCategoriesForLanguage(language)
@@ -97,15 +100,31 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
                 )
             }
 
-            // Idle float on the icon
-            gsap.to(iconRef.current, {
-                y: -6,
-                duration: 2.2,
-                repeat: -1,
-                yoyo: true,
-                ease: "sine.inOut",
-                delay: 0.8,
-            })
+            // Suggestions "Did you mean?" stagger
+            if (suggestionsRef.current) {
+                tl.fromTo(suggestionsRef.current,
+                    { opacity: 0, y: 10 },
+                    { opacity: 1, y: 0, duration: 0.4 },
+                    "-=0.1"
+                )
+                tl.fromTo(Array.from(suggestionsRef.current.querySelectorAll("button")),
+                    { opacity: 0, x: -8 },
+                    { opacity: 1, x: 0, duration: 0.3, stagger: 0.08 },
+                    "-=0.2"
+                )
+            }
+
+            // Idle float — only for the generic "no results" state
+            if (!hasCategory) {
+                gsap.to(iconRef.current, {
+                    y: -6,
+                    duration: 2.2,
+                    repeat: -1,
+                    yoyo: true,
+                    ease: "sine.inOut",
+                    delay: 0.8,
+                })
+            }
         })
 
         return () => ctx.revert()
@@ -115,6 +134,14 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
         const lang = language.toLowerCase()
         const params = cat === "All" ? "" : `?category=${encodeURIComponent(cat)}`
         router.push(`/search/${encodeURIComponent(query)}/${lang}${params}`)
+    }
+
+    const goSuggestion = (word: string) => {
+        const lang = language.toLowerCase()
+        const params = activeCategory && activeCategory !== "All"
+            ? `?category=${encodeURIComponent(activeCategory)}`
+            : ""
+        router.push(`/search/${encodeURIComponent(word)}/${lang}${params}`)
     }
 
     return (
@@ -138,10 +165,10 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
                         {/* Icon */}
                         <div
                             ref={iconRef}
-                            className={`w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg ${
+                            className={`w-20 h-20 rounded-2xl flex items-center justify-center ${
                                 hasCategory
-                                    ? "bg-orange-500/10 shadow-orange-500/10"
-                                    : "bg-primary/10 shadow-primary/10"
+                                    ? ""
+                                    : "bg-primary/10 shadow-lg shadow-primary/10"
                             }`}
                         >
                             {hasCategory
@@ -183,6 +210,27 @@ export function NoResults({ query, activeCategory, language = "english" }: NoRes
                                 </>
                             )}
                         </p>
+
+                        {/* Did you mean? — fuzzy suggestions from dataset */}
+                        {suggestions.length > 0 && (
+                            <div ref={suggestionsRef} className="flex flex-col items-center gap-3 mt-1">
+                                <p className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+                                    Did you mean?
+                                </p>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    {suggestions.map(word => (
+                                        <button
+                                            key={word}
+                                            onClick={() => goSuggestion(word)}
+                                            className="group/sug inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary/8 hover:bg-primary/15 border border-primary/20 hover:border-primary/40 text-sm font-semibold text-primary transition-all duration-200"
+                                        >
+                                            <Search className="w-3 h-3 opacity-60" />
+                                            {word}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Category chips (only when a category was selected and others exist) */}
                         {hasCategory && otherCategories.length > 0 && (
