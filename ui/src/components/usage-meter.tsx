@@ -35,16 +35,25 @@ function UsageRow({
     label,
     used,
     total,
+    unlimited,
     valueLabel,
+    progressClass,
 }: {
     icon: React.ElementType
     label: string
     used: number
     total: number
+    unlimited: boolean
     valueLabel: string
+    progressClass?: string
 }) {
-    const unlimited = total === -1
     const pct = !unlimited && total > 0 ? Math.min(100, (used / total) * 100) : 0
+
+    const defaultColor = pct >= 90
+        ? "[&>div]:bg-red-500"
+        : pct >= 70
+            ? "[&>div]:bg-amber-500"
+            : ""
 
     return (
         <div className="flex flex-col gap-1.5">
@@ -62,7 +71,7 @@ function UsageRow({
             {!unlimited && (
                 <Progress
                     value={pct}
-                    className={cn("h-1.5", pct >= 90 && "[&>div]:bg-red-500", pct >= 70 && pct < 90 && "[&>div]:bg-amber-500")}
+                    className={cn("h-1.5", progressClass ?? defaultColor)}
                 />
             )}
         </div>
@@ -109,31 +118,38 @@ export function UsageMeter() {
                         const searches = usageMap["search"] ?? { current: 0, limit: 3, remaining: 3 }
                         const sparks   = usageMap["ai_chat"] ?? { current: 0, limit: 0, balance: 0 }
 
-                        const sparkUsed      = sparks.current ?? 0
-                        const sparkLimit     = sparks.limit ?? 0
-                        const sparkBalance   = sparks.balance ?? sparks.remaining ?? Math.max(0, sparkLimit - sparkUsed)
-                        const searchRemaining = searches.remaining ?? Math.max(0, searches.limit - searches.current)
+                        // Same logic as billing section
+                        const sparkLimit    = sparks.limit ?? 0
+                        const sparkBalance  = sparks.balance ?? 0
+                        const sparksUnlimited = sparkLimit === -1 && sparkBalance !== 0
+                        const sparkUsed     = sparksUnlimited ? 0 : Math.max(0, sparkLimit - sparkBalance)
+                        const sparkRemaining = sparksUnlimited ? Infinity : Math.max(0, sparkBalance)
 
-                        // limit === -1 means unlimited, but if balance has actually reached 0
-                        // the user is out of credits — don't let the unlimited flag hide that.
-                        const effectiveSparkLimit = sparkLimit === -1 && sparkBalance === 0 ? 0 : sparkLimit
+                        const searchLimit      = searches.limit ?? 0
+                        const searchUnlimited  = searchLimit === -1
+                        const searchRemaining  = searchUnlimited
+                            ? Infinity
+                            : searches.remaining ?? Math.max(0, searchLimit - (searches.current ?? 0))
 
                         return (
                             <>
                                 <UsageRow
                                     icon={SearchIcon}
                                     label="Searches"
-                                    used={searches.current}
-                                    total={searches.limit}
-                                    valueLabel={searchRemaining >= 0 ? `${fmt(searchRemaining)} left` : "∞ Unlimited"}
+                                    used={searches.current ?? 0}
+                                    total={searchLimit}
+                                    unlimited={searchUnlimited}
+                                    valueLabel={searchRemaining >= 0 ? `${fmt(searchRemaining)} left` : "∞"}
                                 />
                                 {!isGuest && (
                                     <UsageRow
                                         icon={ZapIcon}
                                         label="AI Credits"
                                         used={sparkUsed}
-                                        total={effectiveSparkLimit}
-                                        valueLabel={sparkBalance >= 0 ? `${fmt(sparkBalance)} left` : "∞ Unlimited"}
+                                        total={sparksUnlimited ? 0 : sparkLimit}
+                                        unlimited={sparksUnlimited}
+                                        valueLabel={`${fmt(sparkRemaining)} left`}
+                                        progressClass="[&>div]:bg-orange-500"
                                     />
                                 )}
                                 {isGuest && (
