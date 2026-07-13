@@ -1263,7 +1263,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
               limit: sparksUnlimited ? 0 : sparksLimit,
               remaining: sparksUnlimited ? -1 : sparksRemaining,
               unlimited: sparksUnlimited,
-              color: "bg-primary",
+              barClass: "[&>div]:bg-orange-500",
             },
             {
               icon: Search, label: "Searches",
@@ -1271,9 +1271,9 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
               limit: searchUnlimited ? 0 : searchLimit,
               remaining: searchUnlimited ? -1 : Math.max(0, searchLimit - searchCurrent),
               unlimited: searchUnlimited,
-              color: "bg-blue-500",
+              barClass: "[&>div]:bg-blue-500",
             },
-          ].map(({ icon: Icon, label, used, limit, remaining, unlimited, color }) => {
+          ].map(({ icon: Icon, label, used, limit, remaining, unlimited, barClass }) => {
             const pct = unlimited ? 0 : Math.min(100, limit > 0 ? (used / limit) * 100 : 0)
             return (
               <div key={label} className="rounded-2xl border border-border/40 bg-muted/20 px-4 py-3.5 space-y-2.5">
@@ -1286,7 +1286,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
                     {unlimited ? "∞" : `${formatNumber(used)} / ${formatNumber(limit)}`}
                   </span>
                 </div>
-                <Progress value={pct} className="h-1.5 rounded-full bg-muted [&>div]:bg-foreground" />
+                <Progress value={pct} className={`h-1.5 rounded-full bg-muted ${barClass}`} />
                 <p className="text-[11px] text-muted-foreground">
                   {unlimited ? "Unlimited" : `${formatNumber(remaining)} remaining`}
                 </p>
