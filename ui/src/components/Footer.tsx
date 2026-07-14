@@ -72,6 +72,9 @@ export function Footer() {
 					<p className="text-center font-light text-muted-foreground text-sm">
 						&copy; {new Date().getFullYear()} PokiSpokey, All rights reserved
 					</p>
+					<p className="text-center text-xs text-muted-foreground/60">
+						All video content is streamed via the official YouTube IFrame API. PokiSpokey does not host, store, or distribute any video or audio files.
+					</p>
 				</div>
 			</div>
 		</footer>
