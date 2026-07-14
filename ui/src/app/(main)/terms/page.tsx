@@ -102,9 +102,7 @@ export default function TermsPage() {
                 <li>Payments are processed by <span className="text-foreground font-medium">Paddle.com</span>, our Merchant of Record. By subscribing you authorize Paddle to charge your payment method on a recurring basis.</li>
                 <li>Subscriptions renew automatically at the end of each billing cycle (monthly or yearly) at the then-current price unless you cancel before the renewal date.</li>
                 <li>You may cancel at any time through your account settings — access continues until the end of the current paid period.</li>
-                <li>We offer a <span className="text-foreground font-medium">30-day money-back guarantee</span> on all paid subscriptions. Email us at{' '}
-                  <a href="mailto:support@pokispokey.com" className="text-orange-500 hover:underline">support@pokispokey.com</a>{' '}
-                  within 30 days of your initial purchase and we will issue a full refund with no questions asked.</li>
+                <li>We offer a <span className="text-foreground font-medium">30-day money-back guarantee</span> on all paid subscriptions. See our <a href="/refund" className="text-orange-500 hover:underline">Refund Policy</a> for full details.</li>
                 <li>We reserve the right to change pricing with 30 days' notice to existing subscribers.</li>
                 <li>AI credits are consumable, reset monthly, and have no cash value — they cannot be transferred or exchanged.</li>
               </ul>
