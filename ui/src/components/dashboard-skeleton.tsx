@@ -25,29 +25,29 @@ const carouselItems = [
 	{
 		id: "1",
 		image: "/moviesPosters.png",
-		title: "Movies Collection",
-		description: "Hear native speakers in blockbusters, indie films, and classic cinema.",
-		tags: ["Native Speech", "Real Context", "100K+ Clips"],
+		title: "Movies & Cinema",
+		description: "Search how any word is spoken in film scenes — played back via YouTube's official embed API.",
+		tags: ["Native Speech", "Real Context", "YouTube API"],
 	},
 	{
 		id: "2",
 		image: "/PodcastCollection.png",
-		title: "Podcast Series",
-		description: "Learn conversational language from top podcasters across every genre.",
-		tags: ["Conversational", "All Levels", "New Daily"],
+		title: "Podcasts",
+		description: "Find conversational phrases spoken naturally by real podcasters across public YouTube videos.",
+		tags: ["Conversational", "All Levels", "Public Videos"],
 	},
 	{
 		id: "3",
 		image: "/Cartoon_Picture.jpg",
-		title: "Animation Studio",
-		description: "Fun, clear pronunciation from beloved animated shows and cartoons.",
-		tags: ["Clear Speech", "Beginner Friendly", "Family Content"],
+		title: "Animated Shows",
+		description: "Discover clear, expressive pronunciation from animated YouTube content — searchable by word.",
+		tags: ["Clear Speech", "Beginner Friendly", "YouTube Embed"],
 	},
 	{
 		id: "4",
 		image: "/News.jpg",
-		title: "News Channel",
-		description: "Master formal speech and real-world vocabulary from live news broadcasts.",
+		title: "News & Journalism",
+		description: "Search formal vocabulary as spoken in public news broadcasts available on YouTube.",
 		tags: ["Formal Speech", "Current Events", "All Levels"],
 	},
 ];
@@ -152,7 +152,7 @@ export function DashboardSkeleton() {
 								<BlueprintBox colSpan={8} rowSpan={2} dotted={false} className="p-0 border-none !items-start !justify-start">
 									<Card_9>
 										<p className="text-muted-foreground font-medium leading-tight text-left text-xs sm:text-sm">
-											Over <HighlightText variant="underline" color="primary" className="mx-1 font-bold italic">100,000+ authentic YouTube videos</HighlightText> to master native pronunciation in any context.
+											Search across <HighlightText variant="underline" color="primary" className="mx-1 font-bold italic">100,000+ public YouTube videos</HighlightText> — find the exact moment any word is spoken, played back via YouTube's official embed API.
 										</p>
 									</Card_9>
 								</BlueprintBox>
@@ -280,7 +280,7 @@ export function DashboardSkeleton() {
 						</h2>
 
 						<p className="text-sm sm:text-base md:text-lg text-foreground/80 font-medium max-w-2xl mx-auto leading-relaxed mt-2">
-							The acoustic infrastructure layer that helps you listen,<br className="hidden md:block" /> practice, and perfect pronunciation from the live web.
+							A language learning tool that searches public YouTube captions to find the exact moment any word is spoken — played back via YouTube's official embed API. We don't host or store any video content.
 						</p>
 						{showTourHint && (
 							<button
