@@ -13,6 +13,7 @@ const sections = [
   { id: "merchant",      title: "Merchant of Record" },
   { id: "acceptable-use", title: "Acceptable Use" },
   { id: "ip",            title: "Intellectual Property" },
+  { id: "copyright",     title: "Copyright Notice" },
   { id: "ai-disclaimer", title: "AI Disclaimer" },
   { id: "liability",     title: "Liability" },
   { id: "termination",   title: "Termination" },
@@ -144,6 +145,29 @@ export default function TermsPage() {
               </p>
               <p>
                 Video content is owned by the respective YouTube creators and is subject to YouTube's Terms of Service. PokiSpokey does not host or redistribute video files — playback is delivered through the YouTube IFrame API.
+              </p>
+            </section>
+
+            <section id="copyright" className="scroll-mt-20">
+              <h2 className="text-base font-semibold text-foreground mb-3">Copyright Notice</h2>
+              <p className="mb-3">
+                PokiSpokey does not host, store, upload, or redistribute any video or audio content. All video playback is delivered exclusively through the{' '}
+                <a href="https://developers.google.com/youtube/iframe_api_reference" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">official YouTube IFrame API</a>{' '}
+                — the same embedded player provided by YouTube to any website. Copyright enforcement, content monetization, and licensing are handled entirely by YouTube and the respective rights holders.
+              </p>
+              <p className="mb-3">
+                The transcripts indexed by PokiSpokey are derived from YouTube's publicly accessible auto-generated and creator-uploaded captions. PokiSpokey functions as a search and discovery layer — it does not copy, cache, or serve video files or audio streams.
+              </p>
+              <p className="mb-3">
+                This approach is consistent with how other established language learning platforms (such as YouGlish and Language Reactor) operate. Our use of YouTube's IFrame API is fully compliant with the{' '}
+                <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">YouTube Terms of Service</a>{' '}
+                and the{' '}
+                <a href="https://developers.google.com/youtube/terms/api-services-terms-of-service" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">YouTube API Services Terms of Service</a>.
+              </p>
+              <p>
+                If you are a copyright holder and believe your content is being used in a way that infringes your rights, please contact us at{' '}
+                <a href="mailto:support@pokispokey.com" className="text-orange-500 hover:underline">support@pokispokey.com</a>{' '}
+                and we will respond promptly.
               </p>
             </section>
 
