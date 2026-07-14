@@ -26,6 +26,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import TextType from '@/components/TextType';
 import { useDatamuse } from '@/hooks/useDatamuse';
 
@@ -567,13 +568,21 @@ export function SearchBar() {
                 </div>
             </div>
 
-            <button
-                onClick={startTour}
-                title="How it works"
-                className="hidden sm:flex h-9 w-9 rounded-full border border-border shadow-sm bg-card items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            >
-                <HelpCircle className="h-4 w-4" />
-            </button>
+            <TooltipProvider delayDuration={700}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button
+                            onClick={startTour}
+                            className="hidden sm:flex h-9 w-9 rounded-full border border-border shadow-sm bg-card items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                        >
+                            <HelpCircle className="h-4 w-4" />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="px-2 py-1" side="bottom">
+                        How it works
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
 
             {/* Unified Suggestions & Recents Panel */}
             {panelVisible && (

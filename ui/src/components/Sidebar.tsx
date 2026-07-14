@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { Compass, User, Bookmark, LogOut, ChevronLeft, ChevronRight, LayoutGrid, History, Folder, ChevronDown, LifeBuoy, Star, ChevronsUpDown, Plus, Sparkles, CreditCard, Bell, BadgeCheck, Megaphone } from 'lucide-react';
+import { Compass, User, Bookmark, LogOut, ChevronLeft, ChevronRight, LayoutGrid, History, Folder, ChevronDown, LifeBuoy, Star, ChevronsUpDown, Plus, Sparkles, CreditCard, Bell, BadgeCheck, Megaphone, MessageSquare } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -128,6 +128,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobile = false, user }) => {
     { icon: Megaphone, label: 'Changelog', view: ViewState.CHANGELOG, href: '/changelog' },
     { icon: CreditCard, label: 'Pricing', view: ViewState.PRICING, href: '/pricing' },
     { icon: LifeBuoy, label: 'Support', view: ViewState.LANDING, href: '/support' },
+    { icon: MessageSquare, label: 'Feedback', view: ViewState.LANDING, href: undefined },
   ];
 
   return (
@@ -280,7 +281,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobile = false, user }) => {
           )}
           <div className="space-y-1.5">
             {supportNav.map((item, idx) => {
-              if (item.label === 'Support') {
+              if (item.label === 'Support' || item.label === 'Feedback') {
                 return (
                   <FeedbackDialog key={idx}>
                     <div className="w-full cursor-pointer">

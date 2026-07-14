@@ -18,9 +18,8 @@ import { NavGroup } from "@/components/nav-group";
 import { footerNavLinks, navGroups } from "@/components/app-shared";
 import { UsageMeter } from "@/components/usage-meter";
 import { useAuthStore } from "@/stores/auth-store";
-import { BookOpen, MegaphoneIcon, SunIcon, MoonIcon } from "lucide-react";
+import { BookOpen, SunIcon, MoonIcon } from "lucide-react";
 import { openOnboarding } from "@/components/onboarding-dialog";
-import { FeedbackDialog } from "@/components/feedback-dialog";
 import { NavUser } from "@/components/nav-user";
 import { AuthDialog } from "@/components/auth-dialog";
 import { Button } from "@/components/ui/button";
@@ -57,7 +56,7 @@ export function AppSidebar() {
 					</a>
 				</div>
 
-				{/* Mobile-only: auth + theme toggle (hidden on sm and above) */}
+				{/* Mobile-only: auth + theme toggle */}
 				<div className="sm:hidden px-2 pb-3 flex flex-col gap-2">
 					{authStatus === "unknown" ? (
 						<Skeleton className="h-9 w-full rounded-lg" />
@@ -92,7 +91,7 @@ export function AppSidebar() {
 				</div>
 			</SidebarHeader>
 
-			{authStatus !== "authenticated" && (
+			{authStatus === "unknown" ? null : authStatus !== "authenticated" ? (
 				<div className="px-2 py-1">
 					<SidebarMenu>
 						<SidebarMenuItem>
@@ -103,24 +102,27 @@ export function AppSidebar() {
 						</SidebarMenuItem>
 					</SidebarMenu>
 				</div>
-			)}
+			) : null}
 
 			<SidebarContent>
-				{visibleGroups.map((group, index) => (
-					<NavGroup key={`sidebar-group-${index}`} {...group} />
-				))}
-				<SidebarGroup>
-					<SidebarMenu>
-						<SidebarMenuItem>
-							<FeedbackDialog>
-								<SidebarMenuButton>
-									<MegaphoneIcon />
-									<span>Feedback</span>
-								</SidebarMenuButton>
-							</FeedbackDialog>
-						</SidebarMenuItem>
-					</SidebarMenu>
-				</SidebarGroup>
+				{authStatus === "unknown" ? (
+					<SidebarGroup>
+						<SidebarMenu>
+							{Array.from({ length: 5 }).map((_, i) => (
+								<SidebarMenuItem key={i}>
+									<div className="flex items-center gap-2 p-2">
+										<Skeleton className="h-4 w-4 rounded shrink-0" />
+										<Skeleton className="h-4 rounded group-data-[collapsible=icon]:hidden" style={{ width: `${55 + (i % 3) * 20}px` }} />
+									</div>
+								</SidebarMenuItem>
+							))}
+						</SidebarMenu>
+					</SidebarGroup>
+				) : (
+					visibleGroups.map((group, index) => (
+						<NavGroup key={`sidebar-group-${index}`} {...group} />
+					))
+				)}
 			</SidebarContent>
 
 			<SidebarFooter className="border-t border-border/40">
