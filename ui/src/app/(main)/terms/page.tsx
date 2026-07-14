@@ -10,6 +10,7 @@ const sections = [
   { id: "service",       title: "The Service" },
   { id: "accounts",      title: "Accounts" },
   { id: "billing",       title: "Plans & Billing" },
+  { id: "merchant",      title: "Merchant of Record" },
   { id: "acceptable-use", title: "Acceptable Use" },
   { id: "ip",            title: "Intellectual Property" },
   { id: "ai-disclaimer", title: "AI Disclaimer" },
@@ -49,7 +50,7 @@ export default function TermsPage() {
             <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">
               Terms of Service
             </h1>
-            <p className="text-sm text-muted-foreground">Last updated: April 27, 2026</p>
+            <p className="text-sm text-muted-foreground">Last updated: July 14, 2026</p>
           </div>
 
           <div className="space-y-14 text-[15px] leading-relaxed text-muted-foreground">
@@ -70,7 +71,9 @@ export default function TermsPage() {
                 <li><span className="text-foreground font-medium">AI Chat</span> — conversational AI for vocabulary, grammar, pronunciation, and translation questions</li>
                 <li><span className="text-foreground font-medium">Browser extension</span> — optional Chrome extension for in-browser learning</li>
               </ul>
-              <p className="mt-3">We may add, modify, or remove features at any time.</p>
+              <p className="mt-3">
+                The Service is provided for personal language learning purposes. We do not guarantee uninterrupted availability. We may add, modify, or remove features at any time.
+              </p>
             </section>
 
             <section id="accounts" className="scroll-mt-20">
@@ -96,12 +99,29 @@ export default function TermsPage() {
               </ul>
               <p className="mt-4 mb-3">Billing terms:</p>
               <ul className="list-disc pl-5 space-y-1.5">
-                <li>Payments are processed by Polar.sh. By subscribing you authorize recurring charges on your billing cycle</li>
-                <li>You may cancel at any time; access continues until the end of the current billing period</li>
-                <li>All charges are final and non-refundable except where required by law</li>
-                <li>We reserve the right to change pricing with 30 days' notice to existing subscribers</li>
-                <li>AI credits are consumable, reset monthly, and have no cash value — they cannot be transferred or exchanged</li>
+                <li>Payments are processed by <span className="text-foreground font-medium">Paddle.com</span>, our Merchant of Record. By subscribing you authorize Paddle to charge your payment method on a recurring basis.</li>
+                <li>Subscriptions renew automatically at the end of each billing cycle (monthly or yearly) at the then-current price unless you cancel before the renewal date.</li>
+                <li>You may cancel at any time through your account settings — access continues until the end of the current paid period.</li>
+                <li>We offer a <span className="text-foreground font-medium">30-day money-back guarantee</span> on all paid subscriptions. Email us at{' '}
+                  <a href="mailto:support@pokispokey.com" className="text-orange-500 hover:underline">support@pokispokey.com</a>{' '}
+                  within 30 days of your initial purchase and we will issue a full refund with no questions asked.</li>
+                <li>We reserve the right to change pricing with 30 days' notice to existing subscribers.</li>
+                <li>AI credits are consumable, reset monthly, and have no cash value — they cannot be transferred or exchanged.</li>
               </ul>
+            </section>
+
+            <section id="merchant" className="scroll-mt-20">
+              <h2 className="text-base font-semibold text-foreground mb-3">Merchant of Record</h2>
+              <p className="mb-3">
+                Our order process is conducted by our online reseller <span className="text-foreground font-medium">Paddle.com</span>. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns.
+              </p>
+              <p>
+                When you purchase a subscription, your payment details are collected directly by Paddle and are subject to{' '}
+                <a href="https://www.paddle.com/legal/checkout-buyer-terms" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">Paddle's Buyer Terms</a>{' '}
+                and{' '}
+                <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">Paddle's Privacy Policy</a>.
+                PokiSpokey never stores or processes your card data.
+              </p>
             </section>
 
             <section id="acceptable-use" className="scroll-mt-20">

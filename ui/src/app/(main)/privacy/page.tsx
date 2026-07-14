@@ -13,6 +13,8 @@ const sections = [
   { id: "retention",    title: "Retention" },
   { id: "security",     title: "Security" },
   { id: "rights",       title: "Your Rights" },
+  { id: "gdpr",         title: "GDPR (EU Users)" },
+  { id: "ccpa",         title: "CCPA (California)" },
   { id: "cookies",      title: "Cookies" },
   { id: "changes",      title: "Policy Changes" },
   { id: "contact",      title: "Contact" },
@@ -49,7 +51,7 @@ export default function PrivacyPage() {
             <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">
               Privacy Policy
             </h1>
-            <p className="text-sm text-muted-foreground">Last updated: April 27, 2026</p>
+            <p className="text-sm text-muted-foreground">Last updated: July 14, 2026</p>
           </div>
 
           <div className="space-y-14 text-[15px] leading-relaxed text-muted-foreground">
@@ -78,7 +80,10 @@ export default function PrivacyPage() {
                 </div>
                 <div>
                   <p className="font-medium text-foreground mb-1">Billing data</p>
-                  <p>Payments are handled entirely by Polar.sh. We store only your subscription status and customer reference — no card details ever touch our servers.</p>
+                  <p>
+                    Payments are processed by <span className="text-foreground font-medium">Paddle.com</span>, our Merchant of Record. We store only your subscription status and a customer reference ID — no card details, billing addresses, or payment information ever touch our servers. Paddle collects and processes your payment data directly under their own{' '}
+                    <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">Privacy Policy</a>.
+                  </p>
                 </div>
               </div>
             </section>
@@ -94,16 +99,22 @@ export default function PrivacyPage() {
                 <li>Detect and prevent abuse and unauthorized access</li>
                 <li>Improve the Service using anonymized, aggregated data</li>
               </ul>
+              <p className="mt-3">Our legal basis for processing under GDPR is performance of a contract (providing the Service you signed up for) and legitimate interests (security and abuse prevention).</p>
             </section>
 
             <section id="sharing" className="scroll-mt-20">
               <h2 className="text-base font-semibold text-foreground mb-3">Data Sharing</h2>
               <p className="mb-3">We share data only with the services required to operate PokiSpokey:</p>
               <ul className="list-disc pl-5 space-y-1.5">
-                <li><span className="text-foreground font-medium">Polar.sh</span> — payment processing (PCI-DSS compliant)</li>
+                <li>
+                  <span className="text-foreground font-medium">Paddle.com</span> — payment processing and order fulfillment. Paddle acts as our Merchant of Record and processes buyer data (name, email, billing address, payment details) directly under their own{' '}
+                  <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">Privacy Policy</a>.
+                  Per our Data Sharing Addendum with Paddle, they may share with us: your name, email address, and purchase history for subscription management purposes.
+                </li>
                 <li><span className="text-foreground font-medium">Groq</span> — AI inference; your message is sent to generate a response</li>
                 <li><span className="text-foreground font-medium">YouTube</span> — video playback via the official IFrame API</li>
                 <li><span className="text-foreground font-medium">Vercel</span> — frontend hosting</li>
+                <li><span className="text-foreground font-medium">Resend</span> — transactional email delivery</li>
               </ul>
               <p className="mt-3">We do not share your data with advertisers or data brokers.</p>
             </section>
@@ -120,22 +131,52 @@ export default function PrivacyPage() {
 
             <section id="security" className="scroll-mt-20">
               <h2 className="text-base font-semibold text-foreground mb-3">Security</h2>
-              <p>All data is transmitted over TLS/HTTPS. Passwords are hashed before storage. We use short-lived authentication tokens with automatic rotation, rate limiting, and IP-based abuse detection. In the event of a confirmed data breach, we will notify affected users promptly.</p>
+              <p>All data is transmitted over TLS/HTTPS. Passwords are hashed before storage. We use short-lived authentication tokens with automatic rotation, rate limiting, and IP-based abuse detection. PokiSpokey is PCI-DSS compliant by virtue of using Paddle as Merchant of Record — we do not store, process, or transmit any cardholder data. In the event of a confirmed data breach, we will notify affected users promptly.</p>
             </section>
 
             <section id="rights" className="scroll-mt-20">
               <h2 className="text-base font-semibold text-foreground mb-3">Your Rights</h2>
-              <p className="mb-3">Depending on your location (GDPR, CCPA, and similar laws), you may have the right to:</p>
+              <p className="mb-3">Depending on your location, you may have the right to:</p>
               <ul className="list-disc pl-5 space-y-1.5">
                 <li>Access a copy of your personal data</li>
                 <li>Correct inaccurate information</li>
                 <li>Request deletion of your account and all associated data</li>
                 <li>Export your data in a portable format</li>
                 <li>Object to or restrict certain types of processing</li>
+                <li>Withdraw consent at any time (where processing is based on consent)</li>
               </ul>
               <p className="mt-3">
                 To exercise any of these rights, email{' '}
-                <a href="mailto:support@pokispokey.com" className="text-orange-500 hover:underline">support@pokispokey.com</a>. We respond within 30 days.
+                <a href="mailto:support@pokispokey.com" className="text-orange-500 hover:underline">support@pokispokey.com</a>. We respond within 30 days. For rights relating to payment data held by Paddle, please contact Paddle directly via{' '}
+                <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">paddle.com/legal/privacy</a>.
+              </p>
+            </section>
+
+            <section id="gdpr" className="scroll-mt-20">
+              <h2 className="text-base font-semibold text-foreground mb-3">GDPR (EU &amp; EEA Users)</h2>
+              <p className="mb-3">If you are located in the European Union or European Economic Area, the following applies:</p>
+              <ul className="list-disc pl-5 space-y-1.5">
+                <li><span className="text-foreground font-medium">Legal basis for processing:</span> Contract performance (providing the Service), legitimate interests (security, abuse prevention, analytics), and legal obligation (billing record retention).</li>
+                <li><span className="text-foreground font-medium">Data transfers:</span> Some service providers (e.g., Groq, Vercel) are based in the United States. Data transfers are covered by Standard Contractual Clauses or equivalent safeguards.</li>
+                <li><span className="text-foreground font-medium">Right to lodge a complaint:</span> You have the right to complain to your local data protection authority if you believe we have violated your rights.</li>
+                <li><span className="text-foreground font-medium">Data controller:</span> PokiSpokey (contact: support@pokispokey.com). Paddle.com is an independent data controller for payment data they collect.</li>
+              </ul>
+            </section>
+
+            <section id="ccpa" className="scroll-mt-20">
+              <h2 className="text-base font-semibold text-foreground mb-3">CCPA (California Residents)</h2>
+              <p className="mb-3">If you are a California resident, the California Consumer Privacy Act (CCPA) and California Privacy Rights Act (CPRA) grant you the following rights:</p>
+              <ul className="list-disc pl-5 space-y-1.5">
+                <li><span className="text-foreground font-medium">Right to know:</span> You may request a copy of the personal information we have collected about you in the past 12 months.</li>
+                <li><span className="text-foreground font-medium">Right to delete:</span> You may request that we delete your personal information, subject to certain exceptions.</li>
+                <li><span className="text-foreground font-medium">Right to correct:</span> You may request that we correct inaccurate personal information.</li>
+                <li><span className="text-foreground font-medium">Right to opt-out of sale:</span> We do not sell your personal information to third parties.</li>
+                <li><span className="text-foreground font-medium">Right to non-discrimination:</span> We will not discriminate against you for exercising any of these rights.</li>
+              </ul>
+              <p className="mt-3">
+                To exercise these rights, email{' '}
+                <a href="mailto:support@pokispokey.com" className="text-orange-500 hover:underline">support@pokispokey.com</a>{' '}
+                with the subject line "CCPA Request". We will respond within 45 days.
               </p>
             </section>
 
