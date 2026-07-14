@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { LayoutGridIcon, CircleDollarSignIcon, FileTextIcon, UsersIcon, HelpCircleIcon, ShieldIcon, ScaleIcon } from "lucide-react";
+import { LayoutGridIcon, CircleDollarSignIcon, FileTextIcon, UsersIcon, HelpCircleIcon, ShieldIcon, ScaleIcon, ReceiptIcon } from "lucide-react";
 
 export type SidebarNavItem = {
 	title: string;
@@ -67,6 +67,11 @@ export const footerNavLinks: SidebarNavItem[] = [
 		title: "Terms of Service",
 		path: "/terms",
 		icon: <ScaleIcon />,
+	},
+	{
+		title: "Refund Policy",
+		path: "/refund",
+		icon: <ReceiptIcon />,
 	},
 ];
 
