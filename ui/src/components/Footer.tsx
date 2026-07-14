@@ -85,11 +85,15 @@ const company = [
 	},
 	{
 		title: "Privacy Policy",
-		href: "#",
+		href: "/privacy",
 	},
 	{
 		title: "Terms of Service",
-		href: "#",
+		href: "/terms",
+	},
+	{
+		title: "Refund Policy",
+		href: "/refund",
 	},
 	{
 		title: "Contact",
