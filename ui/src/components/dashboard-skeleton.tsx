@@ -43,6 +43,13 @@ const carouselItems = [
 		description: "Fun, clear pronunciation from beloved animated shows and cartoons.",
 		tags: ["Clear Speech", "Beginner Friendly", "Family Content"],
 	},
+	{
+		id: "4",
+		image: "/News.jpg",
+		title: "News Channel",
+		description: "Master formal speech and real-world vocabulary from live news broadcasts.",
+		tags: ["Formal Speech", "Current Events", "All Levels"],
+	},
 ];
 
 import { motion } from "motion/react";
