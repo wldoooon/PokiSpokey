@@ -152,7 +152,7 @@ export function DashboardSkeleton() {
 								<BlueprintBox colSpan={8} rowSpan={2} dotted={false} className="p-0 border-none !items-start !justify-start">
 									<Card_9>
 										<p className="text-muted-foreground font-medium leading-tight text-left text-xs sm:text-sm">
-											Search across <HighlightText variant="underline" color="primary" className="mx-1 font-bold italic">100,000+ public YouTube videos</HighlightText> — find the exact moment any word is spoken, played back via YouTube's official embed API.
+											Over <HighlightText variant="underline" color="primary" className="mx-1 font-bold italic">100,000+ real video clips</HighlightText> to master native pronunciation — find the exact moment any word is spoken in context.
 										</p>
 									</Card_9>
 								</BlueprintBox>
@@ -280,7 +280,7 @@ export function DashboardSkeleton() {
 						</h2>
 
 						<p className="text-sm sm:text-base md:text-lg text-foreground/80 font-medium max-w-2xl mx-auto leading-relaxed mt-2">
-							A language learning tool that searches public YouTube captions to find the exact moment any word is spoken — played back via YouTube's official embed API. We don't host or store any video content.
+							A language learning tool that searches public YouTube captions to find the exact moment any word is spoken, played back via YouTube's official embed API.
 						</p>
 						{showTourHint && (
 							<button
