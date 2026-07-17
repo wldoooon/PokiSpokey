@@ -1007,11 +1007,11 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
   const handleCheckout = async (planId: string) => {
     setCheckoutLoading(planId)
     try {
-      const { data } = await apiClient.post<{ checkout_url: string }>("/billing/checkout", {
+      const { data } = await apiClient.post<{ transaction_id: string }>("/billing/checkout", {
         plan: planId,
         billing_period: "monthly",
       })
-      window.location.href = data.checkout_url
+      ;(window as any).Paddle?.Checkout.open({ transactionId: data.transaction_id })
     } catch (err: any) {
       const msg = err?.response?.data?.detail ?? "Could not start checkout."
       toastManager.add({ title: "Checkout failed", description: msg, type: "error" })

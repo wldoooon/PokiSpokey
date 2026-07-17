@@ -50,6 +50,9 @@ importers:
       '@number-flow/react':
         specifier: ^0.6.0
         version: 0.6.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@paddle/paddle-js':
+        specifier: ^1.6.4
+        version: 1.6.4
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -878,6 +881,9 @@ packages:
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
     engines: {node: '>=8.0.0'}
+
+  '@paddle/paddle-js@1.6.4':
+    resolution: {integrity: sha512-ncfnS6I8mCX6krZ3Sgz2iAYivGmhdI81yt9mT6prtPj4Ipd9J3M12LCJRUFL4FB7BYeeuV04c33RSEnbZUBCaA==}
 
   '@phosphor-icons/react@2.1.10':
     resolution: {integrity: sha512-vt8Tvq8GLjheAZZYa+YG/pW7HDbov8El/MANW8pOAz4eGxrwhnbfrQZq0Cp4q8zBEu8NIhHdnr+r8thnfRSNYA==}
@@ -5504,6 +5510,8 @@ snapshots:
       react-dom: 19.1.0(react@19.1.0)
 
   '@opentelemetry/api@1.9.0': {}
+
+  '@paddle/paddle-js@1.6.4': {}
 
   '@phosphor-icons/react@2.1.10(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
     dependencies:

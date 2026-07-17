@@ -195,12 +195,12 @@ export function PricingCard({
 		// No active subscription — open a fresh checkout session
 		setLoading(true);
 		try {
-			const { data } = await apiClient.post<{ checkout_url: string }>(
+			const { data } = await apiClient.post<{ transaction_id: string }>(
 				"/billing/checkout",
 				{ plan: plan.plan, billing_period: frequency }
 			);
-			window.location.href = data.checkout_url;
-			// don't setLoading(false) — page is navigating away
+			(window as any).Paddle?.Checkout.open({ transactionId: data.transaction_id });
+			setLoading(false);
 		} catch (err: any) {
 			const msg = err?.response?.data?.detail ?? err?.message ?? "Could not start checkout. Please try again.";
 			toastManager.add({
