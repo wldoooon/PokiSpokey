@@ -44,8 +44,8 @@ class Invoice(SQLModel, table=True):
         index=True,
     )
 
-    # Dodo's own payment identifier
-    dodo_payment_id: str = Field(unique=True, index=True)
+    # Paddle's transaction identifier
+    paddle_transaction_id: str = Field(unique=True, index=True)
 
     # Payment amount — always stored in cents to avoid float precision issues
     # Example: $12.00 → stored as 1200
