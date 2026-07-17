@@ -267,31 +267,15 @@ async def _on_sub_active(data: dict, db: AsyncSession, ev: WebhookEvent) -> None
     logger.success(f"[WEBHOOK] {user.email} activated {plan} ({billing_period})")
 
 
-async def _on_sub_renewed(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
-    sub = await _get_sub(data.get("id", ""), db)
-    if not sub:
-        raise ValueError(f"Subscription not found: {data.get('id')}")
-    await _patch_sub(sub, db,
-        status=SubscriptionStatus.ACTIVE,
-        cancel_at_period_end=False,
-        current_period_start=datetime.now(timezone.utc),
-        current_period_end=_parse_dt(data.get("next_billed_at")),
-    )
-    user = await db.get(User, sub.user_id)
-    if user:
-        await reset_ai_credits(db, user, user.tier)
-        await reset_search_limit(db, user, user.tier)
-    ev.subscription_id = sub.id
-    ev.user_id = sub.user_id
-    logger.info(f"[WEBHOOK] Subscription {sub.id} renewed until {sub.current_period_end}")
-
 
 async def _on_sub_updated(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
     """
-    Handles three distinct cases:
+    Handles all subscription.updated cases:
     1. Cancellation scheduled  → scheduled_change.action == "cancel"
     2. Plan changed            → items[0].price.id != current paddle_price_id
-    3. Cancellation reversed   → scheduled_change is None, same price
+    3. Recovery from past_due  → paddle status == "active", our status != ACTIVE
+    4. Renewal                 → active, same price, next_billed_at changed
+    5. Cancellation reversed   → fallthrough (reactivated before period end)
     """
     sub = await _get_sub(data.get("id", ""), db)
     if not sub:
@@ -300,6 +284,8 @@ async def _on_sub_updated(data: dict, db: AsyncSession, ev: WebhookEvent) -> Non
 
     scheduled_change = data.get("scheduled_change")
     new_price_id = _price_id_from_data(data)
+    paddle_status = data.get("status", "")
+    next_billed_at = _parse_dt(data.get("next_billed_at"))
 
     if scheduled_change and scheduled_change.get("action") == "cancel":
         # Case 1: user cancelled — will lose access at period end
@@ -326,12 +312,34 @@ async def _on_sub_updated(data: dict, db: AsyncSession, ev: WebhookEvent) -> Non
                 paddle_price_id=new_price_id,
                 status=SubscriptionStatus.ACTIVE,
                 current_period_start=datetime.now(timezone.utc),
-                current_period_end=_parse_dt(data.get("next_billed_at")),
+                current_period_end=next_billed_at,
             )
             logger.info(f"[WEBHOOK] Subscription {sub.id} plan changed to {plan} ({billing_period})")
 
+    elif paddle_status == "active" and sub.status != SubscriptionStatus.ACTIVE:
+        # Case 3: recovered from past_due / on_hold — restore access
+        await _patch_sub(sub, db,
+            status=SubscriptionStatus.ACTIVE,
+            cancel_at_period_end=False,
+            current_period_end=next_billed_at or sub.current_period_end,
+        )
+        logger.info(f"[WEBHOOK] Subscription {sub.id} recovered — status restored to active")
+
+    elif paddle_status == "active" and next_billed_at and next_billed_at != sub.current_period_end:
+        # Case 4: renewal — update period and reset credits
+        user = await db.get(User, sub.user_id)
+        if user:
+            await reset_ai_credits(db, user, user.tier)
+            await reset_search_limit(db, user, user.tier)
+        await _patch_sub(sub, db,
+            status=SubscriptionStatus.ACTIVE,
+            cancel_at_period_end=False,
+            current_period_end=next_billed_at,
+        )
+        logger.info(f"[WEBHOOK] Subscription {sub.id} renewed — credits reset, period updated to {next_billed_at}")
+
     else:
-        # Case 3: cancellation reversed (reactivated)
+        # Case 5: cancellation reversed (reactivated before period end)
         await _patch_sub(sub, db, cancel_at_period_end=False)
         logger.info(f"[WEBHOOK] Subscription {sub.id} reactivated — cancellation cleared")
 
@@ -360,14 +368,40 @@ async def _on_sub_cancelled(data: dict, db: AsyncSession, ev: WebhookEvent) -> N
     logger.info(f"[WEBHOOK] {user.email} downgraded to free — subscription canceled")
 
 
-async def _on_sub_paused(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+async def _on_sub_past_due(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    """Payment failed on renewal — keep access, mark on_hold for banner display."""
     sub = await _get_sub(data.get("id", ""), db)
     if not sub:
         raise ValueError(f"Subscription not found: {data.get('id')}")
     await _patch_sub(sub, db, status=SubscriptionStatus.ON_HOLD)
     ev.subscription_id = sub.id
     ev.user_id = sub.user_id
-    logger.warning(f"[WEBHOOK] Subscription {sub.id} paused — dunning started")
+    logger.warning(f"[WEBHOOK] Subscription {sub.id} past_due — payment failed, dunning started")
+
+
+async def _on_sub_paused(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    """Subscription manually paused or dunning exhausted — remove access."""
+    sub = await _get_sub(data.get("id", ""), db)
+    if not sub:
+        raise ValueError(f"Subscription not found: {data.get('id')}")
+    await _patch_sub(sub, db, status=SubscriptionStatus.ON_HOLD)
+    ev.subscription_id = sub.id
+    ev.user_id = sub.user_id
+    logger.warning(f"[WEBHOOK] Subscription {sub.id} paused")
+
+
+async def _on_sub_resumed(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
+    """Subscription manually resumed — restore access."""
+    sub = await _get_sub(data.get("id", ""), db)
+    if not sub:
+        raise ValueError(f"Subscription not found: {data.get('id')}")
+    await _patch_sub(sub, db,
+        status=SubscriptionStatus.ACTIVE,
+        current_period_end=_parse_dt(data.get("next_billed_at")) or sub.current_period_end,
+    )
+    ev.subscription_id = sub.id
+    ev.user_id = sub.user_id
+    logger.info(f"[WEBHOOK] Subscription {sub.id} resumed")
 
 
 # ── Transaction / payment handlers ────────────────────────────────────────────
@@ -402,6 +436,17 @@ async def _on_transaction_completed(data: dict, db: AsyncSession, ev: WebhookEve
         amount = 0
     currency = totals.get("currency_code", "USD").upper()
 
+    invoice_url = None
+    if amount > 0:
+        try:
+            inv_pdf = await asyncio.to_thread(
+                paddle_client.get().transactions.get_invoice_pdf,
+                txn_id,
+            )
+            invoice_url = inv_pdf.url if inv_pdf else None
+        except Exception:
+            pass  # invoice URL is optional, don't block invoice creation
+
     db.add(Invoice(
         user_id=user.id,
         subscription_id=sub.id if sub else None,
@@ -413,7 +458,7 @@ async def _on_transaction_completed(data: dict, db: AsyncSession, ev: WebhookEve
         billing_period=sub.billing_period if sub else "one-time",
         period_start=None,
         period_end=None,
-        invoice_url=(data.get("invoice") or {}).get("url"),
+        invoice_url=invoice_url,
     ))
     ev.user_id = user.id
     ev.subscription_id = sub.id if sub else None
@@ -471,7 +516,7 @@ async def _on_refund(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
 
 # ── Subscription management ───────────────────────────────────────────────────
 
-async def cancel_subscription(user: User, db: AsyncSession) -> None:
+async def cancel_subscription(user: User, db: AsyncSession, reason: str | None = None) -> None:
     result = await db.execute(select(Subscription).where(Subscription.user_id == user.id))
     sub = result.scalars().first()
     if not sub:
@@ -484,6 +529,11 @@ async def cancel_subscription(user: User, db: AsyncSession) -> None:
         sub.paddle_subscription_id,
         CancelSubscription(effective_from=SubscriptionEffectiveFrom.NextBillingPeriod),
     )
+    if reason:
+        await db.execute(
+            update(Subscription).where(Subscription.id == sub.id).values(cancellation_reason=reason)
+        )
+        await db.commit()
     logger.info(f"[BILLING] Cancel scheduled for user {user.id} sub {sub.paddle_subscription_id}")
 
 
@@ -533,9 +583,10 @@ async def reactivate_subscription(user: User, db: AsyncSession) -> None:
 _HANDLERS = {
     "subscription.activated":     _on_sub_active,
     "subscription.updated":       _on_sub_updated,
-    "subscription.renewed":       _on_sub_renewed,
-    "subscription.canceled":      _on_sub_cancelled,   # Paddle uses one 'l'
+    "subscription.past_due":      _on_sub_past_due,
     "subscription.paused":        _on_sub_paused,
+    "subscription.resumed":       _on_sub_resumed,
+    "subscription.canceled":      _on_sub_cancelled,   # Paddle uses one 'l'
     "transaction.completed":      _on_transaction_completed,
     "transaction.payment_failed": _on_payment_failed,
     "adjustment.created":         _on_refund,

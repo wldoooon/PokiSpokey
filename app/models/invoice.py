@@ -71,7 +71,7 @@ class Invoice(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True))
     )
 
-    # PDF invoice URL from Dodo (available after payment.succeeded)
+    # PDF invoice URL from Paddle (fetched via GET /transactions/{id}/invoice after transaction.completed)
     invoice_url: str | None = Field(default=None)
 
     # When the payment happened — used for sorting billing history in UI

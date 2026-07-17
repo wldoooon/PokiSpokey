@@ -129,7 +129,7 @@ async def cancel(
     db: AsyncSession = Depends(get_session),
 ):
     try:
-        await cancel_subscription(user=current_user, db=db)
+        await cancel_subscription(user=current_user, db=db, reason=body.reason)
         return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
