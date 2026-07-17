@@ -72,13 +72,7 @@ function CardRow({ method }: { method: PaymentMethod }) {
       </div>
 
       <InfoCol label="Card holder" value={method.card_holder_name || "—"} />
-      <InfoCol label="Expiry date" value={`${method.expiry_month}/${method.expiry_year}`} />
-      <InfoCol label="Card type" value={method.card_type ? method.card_type.charAt(0).toUpperCase() + method.card_type.slice(1) : "—"} />
-      <InfoCol
-        label="Auto-renewal"
-        value={method.recurring_enabled ? "On" : "Off"}
-        valueClass={method.recurring_enabled ? "text-foreground" : "text-muted-foreground"}
-      />
+      <InfoCol label="Expiry date" value={`${String(method.expiry_month).padStart(2, "0")}/${method.expiry_year}`} />
     </div>
   )
 }
@@ -95,8 +89,6 @@ function CardRowSkeleton() {
       </div>
       <div className="space-y-1.5"><Skeleton className="h-3 w-16 rounded" /><Skeleton className="h-4 w-28 rounded" /></div>
       <div className="space-y-1.5"><Skeleton className="h-3 w-16 rounded" /><Skeleton className="h-4 w-14 rounded" /></div>
-      <div className="space-y-1.5"><Skeleton className="h-3 w-14 rounded" /><Skeleton className="h-4 w-12 rounded" /></div>
-      <div className="space-y-1.5"><Skeleton className="h-3 w-16 rounded" /><Skeleton className="h-4 w-8 rounded" /></div>
     </div>
   )
 }

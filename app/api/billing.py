@@ -42,6 +42,7 @@ class UpgradeRequest(BaseModel):
 async def checkout(
     body: CheckoutRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
 ):
     """
     Creates a Paddle transaction for the given product.
@@ -54,6 +55,7 @@ async def checkout(
             user=current_user,
             plan=body.plan,
             billing_period=body.billing_period,
+            db=db,
         )
         return {"transaction_id": transaction_id}
     except Exception as e:
@@ -162,6 +164,50 @@ async def upgrade_plan(
     except Exception as e:
         logger.error(f"[BILLING] Upgrade failed for user {current_user.id}: {e}")
         raise HTTPException(status_code=502, detail="Failed to change subscription plan.")
+
+
+# ── Payment Methods ───────────────────────────────────────────────────────────
+
+@router.get("/payment-methods")
+async def get_payment_methods(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    result = await db.execute(
+        select(Subscription).where(Subscription.user_id == current_user.id)
+    )
+    sub = result.scalars().first()
+    if not sub or not sub.paddle_subscription_id:
+        return {"payment_methods": []}
+    try:
+        import asyncio
+        from ..core.paddle import paddle_client
+        from paddle_billing.Resources.Transactions.Operations import ListTransactions
+
+        txns_page = await asyncio.to_thread(
+            paddle_client.get().transactions.list,
+            ListTransactions(subscription_ids=[sub.paddle_subscription_id]),
+        )
+        for txn in txns_page:
+            if not txn.payments:
+                continue
+            for payment in txn.payments:
+                method = payment.method_details
+                if method and method.type == "card" and method.card:
+                    return {
+                        "payment_methods": [{
+                            "payment_method_id": None,
+                            "card_holder_name": method.card.cardholder_name or "",
+                            "card_network": (method.card.type.value if method.card.type else "").lower(),
+                            "last4": method.card.last4,
+                            "expiry_month": method.card.expiry_month,
+                            "expiry_year": method.card.expiry_year,
+                        }]
+                    }
+        return {"payment_methods": []}
+    except Exception as e:
+        logger.error(f"[BILLING] Failed to fetch payment methods for user {current_user.id}: {e}", exc_info=True)
+        return {"payment_methods": []}
 
 
 # ── Reactivate Subscription ──────────────────────────────────────────────────

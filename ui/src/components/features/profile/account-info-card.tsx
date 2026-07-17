@@ -1011,7 +1011,11 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
         plan: planId,
         billing_period: "monthly",
       })
-      ;(window as any).Paddle?.Checkout.open({ transactionId: data.transaction_id })
+      ;(window as any).Paddle?.Checkout.open({
+        transactionId: data.transaction_id,
+        customer: { email: user?.email },
+        settings: { successUrl: `${window.location.origin}/billing/success`, allowLogout: false },
+      })
     } catch (err: any) {
       const msg = err?.response?.data?.detail ?? "Could not start checkout."
       toastManager.add({ title: "Checkout failed", description: msg, type: "error" })

@@ -158,6 +158,7 @@ export function PricingCard({
 	const [loading, setLoading] = useState(false);
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const status = useAuthStore((s) => s.status);
+	const user = useAuthStore((s) => s.user);
 	const queryClient = useQueryClient();
 	const isCurrentPlan = userTier === plan.name.toLowerCase();
 	const isPaidPlan = !!plan.plan;
@@ -199,7 +200,11 @@ export function PricingCard({
 				"/billing/checkout",
 				{ plan: plan.plan, billing_period: frequency }
 			);
-			(window as any).Paddle?.Checkout.open({ transactionId: data.transaction_id });
+			(window as any).Paddle?.Checkout.open({
+				transactionId: data.transaction_id,
+				customer: { email: user?.email },
+				settings: { successUrl: `${window.location.origin}/billing/success`, allowLogout: false },
+			});
 			setLoading(false);
 		} catch (err: any) {
 			const msg = err?.response?.data?.detail ?? err?.message ?? "Could not start checkout. Please try again.";

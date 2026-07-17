@@ -16,7 +16,7 @@ export type SubscriptionInfo = {
 
 export type InvoiceRow = {
   id: string
-  dodo_payment_id: string | null
+  transaction_id: string | null
   date: string
   description: string
   amount: number
@@ -26,15 +26,12 @@ export type InvoiceRow = {
 }
 
 export type PaymentMethod = {
-  payment_method_id: string
+  payment_method_id: string | null
   card_holder_name: string
-  card_network: string
-  card_type: string
-  expiry_month: string
-  expiry_year: string
+  card_network: string   // e.g. "visa", "mastercard"
   last4: string
-  recurring_enabled: boolean
-  last_used_at: string | null
+  expiry_month: number
+  expiry_year: number
 }
 
 // ── Plan prices (source of truth for display) ─────────────────────────────────

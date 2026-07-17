@@ -134,7 +134,7 @@ function SuccessContent() {
                   <Row
                     label="Invoice"
                     value={(() => {
-                      const id = inv?.dodo_payment_id ?? inv?.id ?? ""
+                      const id = inv?.transaction_id ?? inv?.id ?? ""
                       return id.length > 12 ? `${id.slice(0, 12)}…` : id
                     })()}
                   />

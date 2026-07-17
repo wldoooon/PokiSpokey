@@ -11,6 +11,7 @@ from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Entities.Subscriptions import SubscriptionEffectiveFrom, SubscriptionProrationBillingMode
 from paddle_billing.Resources.Transactions.Operations import CreateTransaction
 from paddle_billing.Resources.Transactions.Operations.Create import TransactionCreateItem
+from paddle_billing.Resources.Customers.Operations import CreateCustomer
 from paddle_billing.Resources.Subscriptions.Operations import CancelSubscription, UpdateSubscription
 from paddle_billing.Resources.Subscriptions.Operations.Update import SubscriptionUpdateItem
 
@@ -60,7 +61,7 @@ def verify_paddle_signature(raw_body: bytes, signature_header: str) -> bool:
 
 # ── Checkout ──────────────────────────────────────────────────────────────────
 
-async def create_checkout_transaction(user: User, plan: str, billing_period: str) -> str:
+async def create_checkout_transaction(user: User, plan: str, billing_period: str, db: AsyncSession | None = None) -> str:
     """
     Creates a Paddle transaction and returns its ID.
     Frontend uses this ID to open Paddle.Checkout.open({ transactionId }).
@@ -69,11 +70,27 @@ async def create_checkout_transaction(user: User, plan: str, billing_period: str
     if not price_id:
         raise ValueError(f"Unknown plan/period: {plan}/{billing_period}")
 
+    customer_id = user.paddle_customer_id
+
+    # Create a Paddle customer if we don't have one yet, so the receipt email goes to the user
+    if not customer_id:
+        paddle_customer = await asyncio.to_thread(
+            paddle_client.get().customers.create,
+            CreateCustomer(email=user.email, name=user.full_name or None),
+        )
+        customer_id = paddle_customer.id
+        if db:
+            await db.execute(
+                update(User).where(User.id == user.id).values(paddle_customer_id=customer_id)
+            )
+            await db.commit()
+        logger.info(f"[BILLING] Created Paddle customer {customer_id} for user {user.id}")
+
     def _create():
         op = CreateTransaction(
             items=[TransactionCreateItem(price_id=price_id, quantity=1)],
             custom_data=CustomData({"user_id": str(user.id)}),
-            customer_id=user.paddle_customer_id if user.paddle_customer_id else None,
+            customer_id=customer_id,
         )
         return paddle_client.get().transactions.create(op)
 
