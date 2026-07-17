@@ -1429,7 +1429,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
                   <TableRow key={inv.id} className="border-border/30 hover:bg-muted/20 transition-colors">
                     <TableCell className="text-sm text-muted-foreground py-4">{filteredInvoices.length - idx}</TableCell>
                     <TableCell className="text-sm font-mono text-foreground py-4 tracking-wide">
-                      {inv.dodo_payment_id ?? inv.id.slice(0, 12).toUpperCase()}
+                      {inv.transaction_id ?? inv.id.slice(0, 12).toUpperCase()}
                     </TableCell>
                     <TableCell className="text-sm font-medium text-foreground py-4">{plan ?? "—"}</TableCell>
                     <TableCell className="text-sm text-foreground py-4 capitalize">{cycle ?? "—"}</TableCell>
@@ -1446,12 +1446,22 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right py-4">
-                      {inv.invoice_url ? (
-                        <Button variant="ghost" size="sm" className="h-7 rounded-lg gap-1.5 text-xs px-2.5 cursor-pointer" asChild>
-                          <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer">
-                            <Download className="h-3 w-3" />
-                            Download
-                          </a>
+                      {inv.transaction_id ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 rounded-lg gap-1.5 text-xs px-2.5 cursor-pointer"
+                          onClick={async () => {
+                            try {
+                              const { data } = await apiClient.get<{ url: string }>(`/billing/invoices/${inv.transaction_id}/pdf`)
+                              if (data.url) window.open(data.url, "_blank")
+                            } catch {
+                              toastManager.add({ title: "Could not fetch invoice", type: "error" })
+                            }
+                          }}
+                        >
+                          <Download className="h-3 w-3" />
+                          Download
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground/40">—</span>
