@@ -21,9 +21,11 @@ export function AsciiBackground({ isDark = false, className }: AsciiBackgroundPr
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    let rafId: number
+    let rafId = 0
     let prevTs = 0
     let t = 0
+    let isVisible = true
+    let isInViewport = true
 
     const sync = () => {
       const rect = canvas.getBoundingClientRect()
@@ -38,9 +40,11 @@ export function AsciiBackground({ isDark = false, className }: AsciiBackgroundPr
     const rgb = isDark ? "255,255,255" : "0,0,0"
 
     const tick = (ts: number) => {
-      rafId = requestAnimationFrame(tick)
       const dt = (ts - prevTs) / 1000
-      if (dt < 1 / FPS) return
+      if (dt < 1 / FPS) {
+        rafId = requestAnimationFrame(tick)
+        return
+      }
       prevTs = ts
       t += Math.min(dt, 0.05)
 
@@ -105,12 +109,50 @@ export function AsciiBackground({ isDark = false, className }: AsciiBackgroundPr
           ctx.fillText(char, c * CELL, (r + 1) * CELL - 4)
         }
       }
+
+      rafId = requestAnimationFrame(tick)
     }
 
-    rafId = requestAnimationFrame(tick)
+    const startLoop = () => {
+      if (rafId === 0 && isVisible && isInViewport) {
+        prevTs = 0
+        rafId = requestAnimationFrame(tick)
+      }
+    }
+
+    const stopLoop = () => {
+      if (rafId !== 0) {
+        cancelAnimationFrame(rafId)
+        rafId = 0
+      }
+    }
+
+    // Pause when tab is hidden, resume when visible again
+    const onVisibilityChange = () => {
+      isVisible = !document.hidden
+      if (isVisible) startLoop()
+      else stopLoop()
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange)
+
+    // Pause when scrolled out of viewport
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        isInViewport = entry.isIntersecting
+        if (isInViewport) startLoop()
+        else stopLoop()
+      },
+      { threshold: 0 }
+    )
+    io.observe(canvas)
+
+    startLoop()
+
     return () => {
-      cancelAnimationFrame(rafId)
+      stopLoop()
       ro.disconnect()
+      io.disconnect()
+      document.removeEventListener("visibilitychange", onVisibilityChange)
     }
   }, [isDark])
 

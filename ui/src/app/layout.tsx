@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import TechnicalLattice from "@/components/TechnicalLattice";
 import AuthSync from "@/components/AuthSync"
+import { AnimationPauser } from "@/components/AnimationPauser"
 import { YouTubeErrorSuppressor } from "@/components/YouTubeErrorSuppressor";
 import { CookieBanner } from "@/components/CookieBanner";
 import FooterWrapper from "@/components/FooterWrapper";
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <QueryProvider>
             <AuthSync />
+            <AnimationPauser />
             <YouTubeErrorSuppressor />
             <CookieBanner />
             <ToastProvider position="bottom-right">

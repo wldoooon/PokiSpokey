@@ -49,6 +49,7 @@ const carouselItems = [
 		title: "News & Journalism",
 		description: "Search formal vocabulary as spoken in public news broadcasts available on YouTube.",
 		tags: ["Formal Speech", "Current Events", "All Levels"],
+		objectPosition: "top",
 	},
 ];
 

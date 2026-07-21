@@ -421,3 +421,11 @@
   display: block;
   width: 100%;
 }
+
+/* Pause all CSS animations when the tab is hidden (set by AnimationPauser.tsx) */
+.page-anim-paused .search-animated-border,
+.page-anim-paused .card-animated-border,
+.page-anim-paused .usage-shimmer,
+.page-anim-paused .gold-shimmer {
+  animation-play-state: paused !important;
+}
