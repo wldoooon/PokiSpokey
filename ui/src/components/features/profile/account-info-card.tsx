@@ -1461,7 +1461,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
                           }}
                         >
                           <Download className="h-3 w-3" />
-                          Download
+                          View
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground/40">—</span>

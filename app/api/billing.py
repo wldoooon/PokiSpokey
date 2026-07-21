@@ -120,6 +120,39 @@ async def get_invoices(
     }
 
 
+# ── Invoice PDF ───────────────────────────────────────────────────────────────
+
+@router.get("/invoices/{transaction_id}/pdf")
+async def get_invoice_pdf(
+    transaction_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    # Verify the invoice belongs to this user
+    result = await db.execute(
+        select(Invoice).where(
+            Invoice.paddle_transaction_id == transaction_id,
+            Invoice.user_id == current_user.id,
+        )
+    )
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Invoice not found.")
+    try:
+        import asyncio
+        from ..core.paddle import paddle_client
+        from paddle_billing.Entities.Shared import Disposition
+        from paddle_billing.Resources.Transactions.Operations import GetTransactionInvoice
+        inv_pdf = await asyncio.to_thread(
+            paddle_client.get().transactions.get_invoice_pdf,
+            transaction_id,
+            GetTransactionInvoice(disposition=Disposition.Inline),
+        )
+        return {"url": inv_pdf.url if inv_pdf else None}
+    except Exception as e:
+        logger.error(f"[BILLING] Failed to fetch invoice PDF for {transaction_id}: {e}")
+        raise HTTPException(status_code=502, detail="Could not fetch invoice PDF.")
+
+
 # ── Cancel Subscription ──────────────────────────────────────────────────────
 
 @router.post("/cancel")

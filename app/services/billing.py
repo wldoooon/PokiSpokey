@@ -326,17 +326,13 @@ async def _on_sub_updated(data: dict, db: AsyncSession, ev: WebhookEvent) -> Non
         logger.info(f"[WEBHOOK] Subscription {sub.id} recovered — status restored to active")
 
     elif paddle_status == "active" and next_billed_at and next_billed_at != sub.current_period_end:
-        # Case 4: renewal — update period and reset credits
-        user = await db.get(User, sub.user_id)
-        if user:
-            await reset_ai_credits(db, user, user.tier)
-            await reset_search_limit(db, user, user.tier)
+        # Case 4: renewal — update period only (credits reset in transaction.completed)
         await _patch_sub(sub, db,
             status=SubscriptionStatus.ACTIVE,
             cancel_at_period_end=False,
             current_period_end=next_billed_at,
         )
-        logger.info(f"[WEBHOOK] Subscription {sub.id} renewed — credits reset, period updated to {next_billed_at}")
+        logger.info(f"[WEBHOOK] Subscription {sub.id} period updated to {next_billed_at}")
 
     else:
         # Case 5: cancellation reversed (reactivated before period end)
@@ -408,12 +404,9 @@ async def _on_sub_resumed(data: dict, db: AsyncSession, ev: WebhookEvent) -> Non
 
 async def _on_transaction_completed(data: dict, db: AsyncSession, ev: WebhookEvent) -> None:
     txn_id = data.get("id", "")
+    origin = data.get("origin", "")
 
-    existing = await db.execute(select(Invoice).where(Invoice.paddle_transaction_id == txn_id))
-    if existing.scalars().first():
-        return
-
-    # Save customer_id to user if not yet stored
+    # Resolve user and subscription first — needed for both credit reset and invoice
     user = await _get_user(data, db)
     if user and not user.paddle_customer_id and data.get("customer_id"):
         user.paddle_customer_id = data["customer_id"]
@@ -426,6 +419,20 @@ async def _on_transaction_completed(data: dict, db: AsyncSession, ev: WebhookEve
 
     if not user:
         logger.warning(f"[WEBHOOK] No user found for transaction {txn_id}")
+        return
+
+    # Renewal: reset credits on every recurring payment — runs even if invoice already exists
+    if origin == "subscription_recurring" and sub:
+        billing_period_end = _parse_dt((data.get("billing_period") or {}).get("ends_at"))
+        if billing_period_end:
+            await _patch_sub(sub, db, current_period_end=billing_period_end)
+        await reset_ai_credits(db, user, user.tier)
+        await reset_search_limit(db, user, user.tier)
+        logger.info(f"[WEBHOOK] Renewal credits reset for {user.email} — tier={user.tier}")
+
+    # Skip invoice creation if already exists (idempotency)
+    existing = await db.execute(select(Invoice).where(Invoice.paddle_transaction_id == txn_id))
+    if existing.scalars().first():
         return
 
     totals = (data.get("details") or {}).get("totals") or {}
@@ -445,7 +452,7 @@ async def _on_transaction_completed(data: dict, db: AsyncSession, ev: WebhookEve
             )
             invoice_url = inv_pdf.url if inv_pdf else None
         except Exception:
-            pass  # invoice URL is optional, don't block invoice creation
+            pass
 
     db.add(Invoice(
         user_id=user.id,
