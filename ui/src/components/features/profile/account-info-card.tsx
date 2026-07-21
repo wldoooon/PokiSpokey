@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Lock, LogOut, Mail, ShieldCheck, CalendarDays,
   Eye, EyeOff, KeyRound, Camera, Languages, ChevronDown, Info,
-  Zap, Search, Check, ArrowUpRight, TriangleAlert, Link2, Unlink, Loader2, Download, Clock, ChevronsUpDown, Upload,
+  Zap, Search, Check, ArrowUpRight, TriangleAlert, Link2, Unlink, Loader2, Download, Clock, ChevronsUpDown, Upload, Sparkles,
   CircleCheck, CircleX, RotateCcw, Ban, CircleAlert,
 } from "lucide-react"
 import {
@@ -69,15 +69,15 @@ const TIER_CONFIG: Record<string, { label: string; className: string; style?: Re
     label: "Basic", className: "",
     style: {
       backgroundImage: [
-        "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.7) 50%, transparent 70%)",
-        "linear-gradient(105deg, #5C3A1E 0%, #A0622A 30%, #CD7F32 50%, #A0622A 70%, #5C3A1E 100%)",
+        "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.8) 50%, transparent 70%)",
+        "linear-gradient(105deg, #C68642 0%, #DFA854 30%, #F5C878 50%, #DFA854 70%, #C68642 100%)",
       ].join(", "),
       backgroundSize: "250% 100%, 100% 100%",
       backgroundRepeat: "no-repeat, no-repeat",
       animation: "gold-shimmer 3.5s ease-in-out infinite",
-      color: "#2A1000",
-      border: "1px solid #8B5E2A",
-      textShadow: "0 1px 1px rgba(255,200,150,0.3)",
+      color: "#5C3A10",
+      border: "1px solid #D4963C",
+      textShadow: "0 1px 1px rgba(255,220,150,0.5)",
     },
   },
   pro: {
@@ -311,19 +311,19 @@ function DeleteAccountDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         <div className="flex flex-col items-center gap-5 pt-2">
           <motion.div
             {...stagger(0)}
-            className="h-16 w-16 rounded-full bg-red-500/10 flex items-center justify-center"
+            className="flex items-center justify-center"
           >
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.05, type: "spring", damping: 16, stiffness: 300 }}
             >
-              <TriangleAlert className="h-8 w-8 text-red-500" />
+              <TriangleAlert className="h-10 w-10 text-orange-500" />
             </motion.div>
           </motion.div>
 
           <motion.div {...stagger(1)} className="text-center space-y-1.5">
-            <DialogTitle className="text-lg">Delete your account</DialogTitle>
+            <DialogTitle className="text-lg text-orange-500">Delete your account</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed">
               This is permanent and cannot be undone. All your data, history,
               and subscription will be erased immediately.
@@ -351,8 +351,7 @@ function DeleteAccountDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               Cancel
             </Button>
             <Button
-              variant="destructive"
-              className="flex-1 rounded-xl h-10 transition-all duration-200"
+              className="flex-1 rounded-xl h-10 bg-orange-500 hover:bg-orange-600 text-white border-0 transition-all duration-200"
               disabled={!canDelete}
             >
               Delete Account
@@ -1095,7 +1094,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
       <div className="rounded-2xl border border-border/50 p-5 space-y-4">
         <div>
           <h3 className="text-base font-bold text-foreground">Subscription details</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">An overview of your plan, usage, and billing cycle.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">An overview of your subscription, usage, and billing cycle.</p>
         </div>
         <Separator />
         {subLoading ? (
@@ -1287,7 +1286,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             {
-              icon: Zap, label: "AI Sparks",
+              icon: Sparkles, label: "AI Sparks",
               used: sparksUsed,
               limit: sparksUnlimited ? 0 : sparksLimit,
               remaining: sparksUnlimited ? -1 : sparksRemaining,
@@ -1308,7 +1307,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
               <div key={label} className="rounded-2xl border border-border/40 bg-muted/20 px-4 py-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Icon className={cn("h-3.5 w-3.5", label === "AI Sparks" ? "text-foreground" : "text-muted-foreground")} />
                     {label}
                   </span>
                   <span className="text-xs text-muted-foreground tabular-nums">
@@ -1571,7 +1570,7 @@ export function AccountInfoCard() {
               {[
                 { value: "account", label: "Account", soon: false },
                 { value: "security", label: "Security", soon: false },
-                { value: "billing", label: "Plan & Billing", soon: false },
+                { value: "billing", label: "Subscription & Billing", soon: false },
               ].map((tab, i, arr) => {
                 const prevTab = arr[i - 1]
                 const isAfterActive = prevTab?.value === activeTab

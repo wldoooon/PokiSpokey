@@ -12,7 +12,7 @@ const easeOutQuint: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
 const menuItems = [
   { id: "profile",  label: "Profile",        icon: UserIcon,     href: "/profile", logout: false },
-  { id: "billing",  label: "Plan & Billing",  icon: CreditCardIcon, href: "/pricing", logout: false },
+  { id: "billing",  label: "Subscription & Billing",  icon: CreditCardIcon, href: "/profile?tab=billing", logout: false },
   { id: "support",  label: "Support",         icon: LifeBuoyIcon, href: "#",        logout: false },
   { id: "divider" },
   { id: "logout",   label: "Log out",         icon: LogOutIcon,   href: null,       logout: true  },
