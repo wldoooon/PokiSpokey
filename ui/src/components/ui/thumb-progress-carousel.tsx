@@ -16,6 +16,7 @@ export interface CarouselItemData {
   title: string;
   description?: string;
   tags?: string[];
+  objectPosition?: string;
 }
 
 export interface ThumbProgressCarouselProps {
@@ -82,46 +83,13 @@ export function ThumbProgressCarousel({
                   alt={item.title}
                   fill
                   className='object-cover transition-transform duration-700 ease-in-out group-hover:scale-105'
+                  style={{ objectPosition: item.objectPosition ?? 'center' }}
                   priority
                 />
                 {/* Dark gradient overlay */}
                 <div className='absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/85' />
               </div>
 
-              {/* Text overlay */}
-              <div className='absolute inset-0 flex flex-col justify-end p-5 pb-16'>
-                {/* Tag pills */}
-                {item.tags && item.tags.length > 0 && (
-                  <div className='flex flex-wrap gap-1.5 mb-3'>
-                    {item.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className='inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-white/90 bg-white/15 backdrop-blur-sm border border-white/20 rounded-full px-2.5 py-0.5'
-                      >
-                        <svg className='w-2.5 h-2.5 text-orange-400 shrink-0' viewBox='0 0 12 12' fill='none'>
-                          <path d='M2 6l3 3 5-5' stroke='currentColor' strokeWidth='1.8' strokeLinecap='round' strokeLinejoin='round'/>
-                        </svg>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Title */}
-                <h3
-                  className='text-2xl sm:text-3xl font-black text-white uppercase tracking-tight leading-none mb-2'
-                  style={{ fontFamily: 'var(--font-carter-one)' }}
-                >
-                  {item.title}
-                </h3>
-
-                {/* Description */}
-                {item.description && (
-                  <p className='text-xs sm:text-sm text-white/70 leading-snug line-clamp-2'>
-                    {item.description}
-                  </p>
-                )}
-              </div>
             </CarouselItem>
           ))}
         </CarouselContent>
@@ -142,8 +110,7 @@ export function ThumbProgressCarousel({
                   ? 'text-white'
                   : 'text-white/40 group-hover/nav:text-white/70'
               )}
-              style={idx === current ? { fontFamily: 'var(--font-carter-one)' } : undefined}
-            >
+              >
               {item.title}
             </span>
             <div className='h-0.5 w-full bg-white/20 rounded-full overflow-hidden'>
