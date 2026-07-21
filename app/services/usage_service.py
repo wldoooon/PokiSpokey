@@ -415,6 +415,14 @@ async def deduct_ai_credits(db: AsyncSession, user: User, total_tokens_used: int
         await db.commit()
         await db.refresh(usage)
 
+        # Mark dirty so sync job resets credits next month for free users
+        try:
+            from ..core.redis import get_redis
+            r = await get_redis()
+            await r.sadd("usage:dirty_users", str(user.id))
+        except Exception:
+            pass
+
         logger.info(
             f"[AI Credits] Deducted {total_tokens_used} tokens from user {user.id}. "
             f"New balance: {usage.ai_credit_balance}"

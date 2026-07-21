@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation } from "@tanstack/react-query"
 import { apiClient } from "@/lib/apiClient"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -82,5 +82,17 @@ export function usePaymentMethodsQuery() {
       return res.data.payment_methods
     },
     staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function usePortalSessionMutation() {
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.post<{ url: string }>("/billing/portal-session")
+      return res.data.url
+    },
+    onSuccess: (url) => {
+      window.open(url, "_blank", "noopener,noreferrer")
+    },
   })
 }

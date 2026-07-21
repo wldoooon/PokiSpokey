@@ -3,7 +3,9 @@
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
-import { usePaymentMethodsQuery } from "@/lib/billingHooks"
+import { Button } from "@/components/ui/button"
+import { Loader2, CreditCard } from "lucide-react"
+import { usePaymentMethodsQuery, usePortalSessionMutation } from "@/lib/billingHooks"
 import type { PaymentMethod } from "@/lib/billingHooks"
 import {
   SiVisa,
@@ -97,12 +99,31 @@ function CardRowSkeleton() {
 
 export function PaymentCards() {
   const { data: methods = [], isLoading: loading } = usePaymentMethodsQuery()
+  const { mutate: openPortal, isPending } = usePortalSessionMutation()
 
   return (
     <div className="rounded-2xl border border-border/50 bg-card p-5 space-y-4">
-      <div>
-        <h3 className="text-base font-bold text-foreground">Payment information</h3>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage your payment methods</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-base font-bold text-foreground">Payment information</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage your payment methods</p>
+        </div>
+        {!loading && methods.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openPortal()}
+            disabled={isPending}
+            className="shrink-0"
+          >
+            {isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CreditCard className="h-4 w-4" />
+            )}
+            Update card
+          </Button>
+        )}
       </div>
       <Separator />
       <div className="space-y-2">

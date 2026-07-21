@@ -13,6 +13,7 @@ from paddle_billing.Resources.Transactions.Operations import CreateTransaction
 from paddle_billing.Resources.Transactions.Operations.Create import TransactionCreateItem
 from paddle_billing.Resources.Customers.Operations import CreateCustomer
 from paddle_billing.Resources.Subscriptions.Operations import CancelSubscription, UpdateSubscription
+from paddle_billing.Resources.CustomerPortalSessions.Operations import CreateCustomerPortalSession
 from paddle_billing.Resources.Subscriptions.Operations.Update import SubscriptionUpdateItem
 
 from ..core.config import get_settings
@@ -98,6 +99,37 @@ async def create_checkout_transaction(user: User, plan: str, billing_period: str
     if not transaction or not transaction.id:
         raise ValueError("Paddle returned no transaction ID")
     return transaction.id
+
+
+# ── Customer Portal Session ───────────────────────────────────────────────────
+
+async def create_portal_session(user: User, db: AsyncSession) -> str:
+    """
+    Creates a Paddle customer portal session and returns the authenticated URL
+    for updating the payment method on the user's active subscription.
+    """
+    if not user.paddle_customer_id:
+        raise ValueError("No Paddle customer found for this user.")
+
+    result = await db.execute(
+        select(Subscription).where(Subscription.user_id == user.id)
+    )
+    sub = result.scalars().first()
+    if not sub or not sub.paddle_subscription_id:
+        raise ValueError("No active subscription found.")
+
+    session = await asyncio.to_thread(
+        paddle_client.get().customer_portal_sessions.create,
+        user.paddle_customer_id,
+        CreateCustomerPortalSession(subscription_ids=[sub.paddle_subscription_id]),
+    )
+
+    for sub_url in session.urls.subscriptions:
+        if sub_url.id == sub.paddle_subscription_id:
+            return sub_url.update_subscription_payment_method
+
+    # Fallback: general portal overview
+    return session.urls.general.overview
 
 
 # ── Webhook dispatcher ────────────────────────────────────────────────────────

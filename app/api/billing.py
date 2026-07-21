@@ -15,6 +15,7 @@ from ..services.billing import (
     reactivate_subscription,
     change_subscription_plan,
     verify_paddle_signature,
+    create_portal_session,
 )
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -241,6 +242,27 @@ async def get_payment_methods(
     except Exception as e:
         logger.error(f"[BILLING] Failed to fetch payment methods for user {current_user.id}: {e}", exc_info=True)
         return {"payment_methods": []}
+
+
+# ── Customer Portal Session ───────────────────────────────────────────────────
+
+@router.post("/portal-session")
+async def get_portal_session(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Creates a Paddle customer portal session and returns an authenticated
+    URL for the user to update their payment method.
+    """
+    try:
+        url = await create_portal_session(user=current_user, db=db)
+        return {"url": url}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[BILLING] Portal session failed for user {current_user.id}: {e}")
+        raise HTTPException(status_code=502, detail="Failed to create portal session.")
 
 
 # ── Reactivate Subscription ──────────────────────────────────────────────────

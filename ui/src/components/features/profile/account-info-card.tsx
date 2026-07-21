@@ -65,20 +65,34 @@ const PLANS = [
 
 const TIER_CONFIG: Record<string, { label: string; className: string; style?: React.CSSProperties }> = {
   free:  { label: "Free",  className: "bg-muted text-muted-foreground border-border" },
-  basic: { label: "Basic", className: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  basic: {
+    label: "Basic", className: "",
+    style: {
+      backgroundImage: [
+        "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.7) 50%, transparent 70%)",
+        "linear-gradient(105deg, #5C3A1E 0%, #A0622A 30%, #CD7F32 50%, #A0622A 70%, #5C3A1E 100%)",
+      ].join(", "),
+      backgroundSize: "250% 100%, 100% 100%",
+      backgroundRepeat: "no-repeat, no-repeat",
+      animation: "gold-shimmer 3.5s ease-in-out infinite",
+      color: "#2A1000",
+      border: "1px solid #8B5E2A",
+      textShadow: "0 1px 1px rgba(255,200,150,0.3)",
+    },
+  },
   pro: {
     label: "Pro", className: "",
     style: {
       backgroundImage: [
-        "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.75) 50%, transparent 70%)",
-        "linear-gradient(105deg, #7A5C00 0%, #C9A020 30%, #FFD700 50%, #C9A020 70%, #7A5C00 100%)",
+        "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.85) 50%, transparent 70%)",
+        "linear-gradient(105deg, #4A4A4A 0%, #909090 30%, #D8D8D8 50%, #909090 70%, #4A4A4A 100%)",
       ].join(", "),
       backgroundSize: "250% 100%, 100% 100%",
       backgroundRepeat: "no-repeat, no-repeat",
       animation: "gold-shimmer 3s ease-in-out infinite",
-      color: "#3D2400",
-      border: "1px solid #B8860B",
-      textShadow: "0 1px 1px rgba(255,255,255,0.4)",
+      color: "#1A1A1A",
+      border: "1px solid #A0A0A0",
+      textShadow: "0 1px 1px rgba(255,255,255,0.5)",
     },
   },
   max: {
@@ -520,11 +534,26 @@ function AccountTab({ user }: { user: typeof MOCK_USER }) {
               <span className="text-[11px] font-semibold uppercase tracking-wider">{label}</span>
             </div>
             {badge ? (
-              <Badge variant="outline" className={cn(
-                "text-[10px] font-semibold px-2 py-0 rounded-full mt-1",
-                ok ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                  : "bg-red-500/10 text-red-500 border-red-500/20"
-              )}>
+              <Badge
+                variant="outline"
+                className="text-[10px] font-semibold px-2 py-0 rounded-full mt-1"
+                style={ok ? {
+                  backgroundImage: [
+                    "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.75) 50%, transparent 70%)",
+                    "linear-gradient(105deg, #064E1A 0%, #15803D 30%, #4ADE80 50%, #15803D 70%, #064E1A 100%)",
+                  ].join(", "),
+                  backgroundSize: "250% 100%, 100% 100%",
+                  backgroundRepeat: "no-repeat, no-repeat",
+                  animation: "gold-shimmer 3s ease-in-out infinite",
+                  color: "#022C0E",
+                  border: "1px solid #16A34A",
+                  textShadow: "0 1px 1px rgba(134,239,172,0.4)",
+                } : {
+                  backgroundColor: "rgb(239 68 68 / 0.1)",
+                  color: "rgb(239 68 68)",
+                  borderColor: "rgb(239 68 68 / 0.2)",
+                }}
+              >
                 {value}
               </Badge>
             ) : (
@@ -678,23 +707,19 @@ function AccountTab({ user }: { user: typeof MOCK_USER }) {
       </div>
 
       {/* Danger zone */}
-      <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.03] px-5 py-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <TriangleAlert className="h-4 w-4 text-red-500/70" />
-          <h3 className="text-sm font-semibold text-red-500/80">Danger Zone</h3>
-        </div>
-        <div className="flex items-center justify-between gap-4">
+      <div className="rounded-2xl bg-orange-500/[0.06] px-5 py-4 space-y-3">
+        <h3 className="text-sm font-bold text-orange-500">Danger zone</h3>
+        <div className="rounded-xl border border-border/50 bg-card px-4 py-3 flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-foreground">Delete account</p>
+            <p className="text-sm font-semibold text-foreground">Delete account</p>
             <p className="text-xs text-muted-foreground mt-0.5">Permanently remove your account and all associated data.</p>
           </div>
           <Button
-            variant="outline"
             size="sm"
-            className="shrink-0 rounded-xl h-9 px-4 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50 transition-colors"
+            className="shrink-0 rounded-xl h-9 px-4 bg-orange-500 hover:bg-orange-600 text-white border-0 transition-colors"
             onClick={() => setDeleteOpen(true)}
           >
-            Delete
+            Delete account
           </Button>
         </div>
       </div>
