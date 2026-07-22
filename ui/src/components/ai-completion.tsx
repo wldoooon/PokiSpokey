@@ -238,7 +238,6 @@ export function AiCompletion({
     // Ref-based blur gradients — fixes the duplicate global ID bug when two instances render
     const topBlurRef = useRef<HTMLDivElement>(null);
     const bottomBlurRef = useRef<HTMLDivElement>(null);
-    const [maxResponseHeight, setMaxResponseHeight] = useState<number>(400);
     const [canScroll, setCanScroll] = useState(false);
 
     const {
@@ -328,30 +327,6 @@ export function AiCompletion({
     }, [isLoading, completion, currentBranch]);
 
     useEffect(() => {
-        const calculateMaxHeight = () => {
-            const container = responseContainerRef.current?.closest('.flex.flex-col') as HTMLElement;
-            if (!container) return;
-
-            const containerHeight = container.clientHeight;
-            const header = container.querySelector('header');
-            const footer = container.querySelector('footer');
-            const suggestions = container.querySelector('[class*="suggestions"]');
-
-            const headerHeight = header?.clientHeight || 0;
-            const footerHeight = footer?.clientHeight || 0;
-            const suggestionsHeight = !shouldHideSuggestions && suggestions?.clientHeight || 0;
-            const extraBuffer = totalBranches > 1 ? 180 : 100;
-
-            const availableSpace = containerHeight - headerHeight - footerHeight - suggestionsHeight - extraBuffer;
-            setMaxResponseHeight(Math.max(120, Math.min(availableSpace, 600)));
-        };
-
-        calculateMaxHeight();
-        window.addEventListener('resize', calculateMaxHeight);
-        return () => window.removeEventListener('resize', calculateMaxHeight);
-    }, [shouldHideSuggestions, totalBranches]);
-
-    useEffect(() => {
         const checkScrollable = () => {
             if (scrollContentRef.current) {
                 const { scrollHeight, clientHeight } = scrollContentRef.current;
@@ -366,7 +341,7 @@ export function AiCompletion({
             clearTimeout(timeout);
             window.removeEventListener('resize', checkScrollable);
         };
-    }, [completion, currentBranch, maxResponseHeight, isLoading]);
+    }, [completion, currentBranch, isLoading]);
 
     const handleSuggestionClick = (suggestion: SmartSuggestion) => {
         if (outOfSparks) return;
@@ -550,7 +525,7 @@ export function AiCompletion({
                 </div>
             </header>
 
-            <main className="w-full flex-1 flex flex-col mt-3 sm:mt-6 space-y-4 sm:space-y-6 min-h-0 overflow-y-auto px-4 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <main className="w-full flex-1 flex flex-col mt-3 sm:mt-6 space-y-4 sm:space-y-6 min-h-0 px-4 sm:px-6">
                 {/* Suggestions */}
                 <AnimatePresence>
                     {!shouldHideSuggestions && (
@@ -623,14 +598,14 @@ export function AiCompletion({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ duration: 0.5 }}
-                            className="w-full"
+                            className="w-full flex-1 flex flex-col min-h-0"
                         >
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="font-mono text-[9px] tracking-[0.25em] text-muted-foreground/30 uppercase shrink-0">Response</span>
                                 <div className="h-px flex-1 bg-border/30" />
                             </div>
-                            <div ref={responseContainerRef} className="relative text-left">
-                                <div className="relative">
+                            <div ref={responseContainerRef} className="relative text-left flex-1 flex flex-col min-h-0">
+                                <div className="relative flex-1 flex flex-col min-h-0">
                                     {/* Top blur gradient — ref-based, safe with multiple instances */}
                                     {canScroll && (
                                         <div
@@ -641,8 +616,7 @@ export function AiCompletion({
 
                                     <div
                                         ref={scrollContentRef}
-                                        style={{ maxHeight: `${maxResponseHeight}px` }}
-                                        className="overflow-y-auto overflow-x-hidden text-card-foreground pl-1 pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
+                                        className="flex-1 overflow-y-auto overflow-x-hidden text-card-foreground pl-1 pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
                                         onScroll={(e) => {
                                             const el = e.currentTarget;
                                             if (topBlurRef.current) {
@@ -730,18 +704,6 @@ export function AiCompletion({
                                     )}
                                 </div>
 
-                                {!isLoading && !error && totalBranches > 1 && (
-                                    <div className="mt-4 pt-4 border-t">
-                                        <BranchTimeline
-                                            currentIndex={currentIndex}
-                                            branches={branches}
-                                            onSelectIndex={navigateToIndex}
-                                            onPrevious={goToPrevious}
-                                            onNext={goToNext}
-                                            isLoading={isLoading}
-                                        />
-                                    </div>
-                                )}
                             </div>
                         </motion.div>
                     )}
@@ -749,6 +711,19 @@ export function AiCompletion({
             </main>
 
             <footer className="relative w-full flex-shrink-0 mt-auto px-4 pb-4 sm:px-6 sm:pb-6 pt-4">
+                {!isLoading && !error && totalBranches > 1 && (
+                    <div className="mb-2">
+                        <BranchTimeline
+                            currentIndex={currentIndex}
+                            branches={branches}
+                            onSelectIndex={navigateToIndex}
+                            onPrevious={goToPrevious}
+                            onNext={goToNext}
+                            isLoading={isLoading}
+                        />
+                    </div>
+                )}
+
                 <div className="absolute top-0 left-0 right-0 flex h-px">
                     <div className="w-1/2 bg-gradient-to-r from-transparent to-border"></div>
                     <div className="w-1/2 bg-gradient-to-l from-transparent to-border"></div>
