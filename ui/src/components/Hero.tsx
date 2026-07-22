@@ -197,7 +197,7 @@ export function Hero() {
               <h1 className={cn("text-[clamp(3.5rem,8vw,4.5rem)] lg:text-7xl font-black text-foreground tracking-tighter leading-[0.85] mb-6 relative inline-block w-fit", carterOne.className)}>
                 {/* Mascot Behind Text - Anchored together using 'em' scaling */}
                 <span
-                  className="absolute -z-10 opacity-80 pointer-events-none transition-transform duration-1000 group-hover:scale-105 inline-block"
+                  className="absolute -z-10 opacity-80 pointer-events-none transition-transform duration-1000 group-hover:scale-105 max-sm:hidden"
                   style={{
                     width: '6em',
                     height: '6em',

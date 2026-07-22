@@ -118,7 +118,7 @@ export function DashboardSkeleton() {
 								<BlueprintBox colSpan={7} rowSpan={3} dotted={false} className="px-8 border-b-primary/10">
 									<div className="flex flex-col items-start justify-center h-full w-full relative">
 										{mounted && (
-											<div className="absolute -right-10 sm:-right-20 md:-right-42 top-1/2 -translate-y-1/2 w-52 sm:w-64 md:w-80 opacity-90 pointer-events-none z-2">
+											<div className="absolute -right-10 sm:-right-20 md:-right-42 top-1/2 -translate-y-1/2 w-52 sm:w-64 md:w-80 opacity-90 pointer-events-none z-2 max-sm:hidden">
 												<img
 													src={resolvedTheme === 'dark' ? "/sleeping_cat.png" : "/cat_logo3.png"}
 													alt="Mascot"
@@ -192,11 +192,11 @@ export function DashboardSkeleton() {
 													{ name: "DEUTSCH", icon: "/countries/germany.png" },
 													{ name: "FRANÇAIS", icon: "/countries/france.png" }
 												].map((lang, idx) => (
-													<div key={`${copy}-${idx}`} className="w-[192px] h-full border-r border-border/40 shrink-0 relative flex items-center justify-center">
+													<div key={`${copy}-${idx}`} className="w-[120px] sm:w-[192px] h-full border-r border-border/40 shrink-0 relative flex items-center justify-center">
 														{/* Floating Language Tags */}
-														<div className="z-10 bg-background/90 text-foreground text-[10px] sm:text-xs font-mono px-4 py-3 rounded-none shadow-sm opacity-95 backdrop-blur-md flex items-center gap-4 transition-all">
-															<img src={lang.icon} alt={lang.name} className="w-12 h-auto max-h-8 object-contain" />
-															<span className="font-bold tracking-widest text-foreground/80 text-[11px]">
+														<div className="z-10 bg-background/90 text-foreground text-[10px] sm:text-xs font-mono px-2 py-2 sm:px-4 sm:py-3 rounded-none shadow-sm opacity-95 backdrop-blur-md flex items-center gap-2 sm:gap-4 transition-all">
+															<img src={lang.icon} alt={lang.name} className="w-7 sm:w-12 h-auto max-h-6 sm:max-h-8 object-contain" />
+															<span className="font-bold tracking-widest text-foreground/80 text-[9px] sm:text-[11px]">
 																{lang.name}
 															</span>
 														</div>

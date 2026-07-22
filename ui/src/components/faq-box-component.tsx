@@ -72,10 +72,10 @@ export function FaqBoxComponent() {
 
 			<FullWidthDivider contained />
 
-			<div className="flex flex-wrap gap-1 border-b px-4 md:gap-3">
+			<div className="flex overflow-x-auto scrollbar-none gap-1 border-b px-4 md:gap-3">
 				{categories.map((cat) => (
 					<button
-						className="flex flex-col"
+						className="flex flex-col shrink-0"
 						key={cat.id}
 						onClick={() => setActiveCategory(cat.id)}
 						type="button"
