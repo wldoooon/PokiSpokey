@@ -197,25 +197,25 @@ export default function RoutedSearchPage() {
 
             {/* ── Mobile/Tablet Tab Bar (below xl) ── */}
             {(playlist.length > 0 || isLoading || isFetching) && (
-              <div className="xl:hidden flex items-center gap-1 px-4 pt-3 sm:px-6">
+              <div className="xl:hidden flex items-center gap-1 px-4 pt-2 sm:px-6">
                 <button
                   onClick={() => setMobileTab("player")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${mobileTab === "player"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${mobileTab === "player"
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:text-foreground"
                     }`}
                 >
-                  <Play className="h-3.5 w-3.5" />
+                  <Play className="h-3 w-3" />
                   Player
                 </button>
                 <button
                   onClick={() => setMobileTab("ai")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${mobileTab === "ai"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${mobileTab === "ai"
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:text-foreground"
                     }`}
                 >
-                  <Bot className="h-3.5 w-3.5" />
+                  <Bot className="h-3 w-3" />
                   AI Assistant
                 </button>
               </div>

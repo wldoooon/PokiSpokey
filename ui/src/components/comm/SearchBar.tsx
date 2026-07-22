@@ -376,8 +376,8 @@ export function SearchBar() {
                                     <ChevronDown className="w-3 h-3 opacity-40" />
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent align="start" className="w-[210px] p-2 rounded-xl shadow-lg" sideOffset={8}>
-                                <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-2 pt-1 pb-2">
+                            <PopoverContent align="start" className="w-[170px] sm:w-[210px] p-1.5 sm:p-2 rounded-xl shadow-lg" sideOffset={8}>
+                                <p className="text-[9px] sm:text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-2 pt-1 pb-1.5 sm:pb-2">
                                     Search in
                                 </p>
                                 <div className="flex flex-col gap-0.5">
@@ -388,7 +388,7 @@ export function SearchBar() {
                                                 key={cat.value}
                                                 onClick={() => toggleCategory(cat.value)}
                                                 className={cn(
-                                                    "group flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-sm transition-all duration-150 cursor-pointer border",
+                                                    "group flex items-center gap-2 sm:gap-2.5 w-full px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-all duration-150 cursor-pointer border",
                                                     selected
                                                         ? "bg-muted text-foreground border-border hover:bg-muted/70"
                                                         : "text-muted-foreground hover:bg-muted/60 hover:text-foreground border-transparent"
@@ -508,8 +508,8 @@ export function SearchBar() {
                                     <span className="hidden md:inline">{selectedLanguage}</span>
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-[180px] p-2 rounded-xl" sideOffset={8}>
-                                <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
+                            <DropdownMenuContent align="end" className="w-[150px] sm:w-[180px] p-1.5 sm:p-2 rounded-xl" sideOffset={8}>
+                                <DropdownMenuLabel className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider px-2 py-1">
                                     Language
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
@@ -526,18 +526,18 @@ export function SearchBar() {
                                             setSelectedCategories(['All']);
                                         }}
                                         className={cn(
-                                            "rounded-lg py-2.5 flex items-center justify-between",
+                                            "rounded-lg py-1.5 sm:py-2.5 flex items-center justify-between",
                                             lang.available ? "cursor-pointer" : "cursor-not-allowed opacity-50 text-muted-foreground",
                                             selectedLanguage === lang.value && "bg-accent text-accent-foreground"
                                         )}
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn("w-5 h-5 rounded-full overflow-hidden shadow-sm border border-border/50", !lang.available && "grayscale")}>
+                                        <div className="flex items-center gap-2 sm:gap-3">
+                                            <div className={cn("w-4 h-4 sm:w-5 sm:h-5 rounded-full overflow-hidden shadow-sm border border-border/50", !lang.available && "grayscale")}>
                                                 <img src={lang.flag} alt={lang.value} className="w-full h-full object-cover" />
                                             </div>
-                                            <span className="text-sm font-medium">{lang.label}</span>
+                                            <span className="text-xs sm:text-sm font-medium">{lang.label}</span>
                                         </div>
-                                        {selectedLanguage === lang.value && <Check className="w-4 h-4 ml-2" />}
+                                        {selectedLanguage === lang.value && <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1.5 sm:ml-2" />}
                                     </DropdownMenuItem>
                                 ))}
                             </DropdownMenuContent>
