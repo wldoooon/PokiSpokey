@@ -1604,9 +1604,7 @@ export function AccountInfoCard() {
                 { value: "account", label: "Account", mobileLabel: "Account", soon: false },
                 { value: "security", label: "Security", mobileLabel: "Security", soon: false },
                 { value: "billing", label: "Subscription & Billing", mobileLabel: "Billing", soon: false },
-              ].map((tab, i, arr) => {
-                const prevTab = arr[i - 1]
-                const isAfterActive = prevTab?.value === activeTab
+              ].map((tab, i) => {
                 return (
                   <TabsTrigger
                     key={tab.value}
@@ -1621,12 +1619,6 @@ export function AccountInfoCard() {
                       tab.soon && "cursor-not-allowed opacity-50"
                     )}
                   >
-                    {/* Concave junction notch on left when previous tab is active */}
-                    {isAfterActive && (
-                      <span className="absolute -left-2 bottom-0 w-2 h-2 overflow-hidden pointer-events-none">
-                        <span className="absolute bottom-0 right-0 w-4 h-4 rounded-br-xl bg-card" />
-                      </span>
-                    )}
                     <span className="flex items-center gap-1.5">
                       <span className="sm:hidden">{tab.mobileLabel}</span>
                       <span className="hidden sm:inline">{tab.label}</span>

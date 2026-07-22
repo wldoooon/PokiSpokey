@@ -50,7 +50,7 @@ const plans: Plan[] = [
 	{
 		name: "Basic",
 		info: "For casual learners",
-		price: { monthly: 7, yearly: 5 },
+		price: { monthly: 9, yearly: 7 },
 		features: [
 			"300 Searches / month",
 			"800,000 AI Credits / month",
@@ -64,7 +64,7 @@ const plans: Plan[] = [
 		highlighted: true,
 		name: "Pro",
 		info: "For committed learners",
-		price: { monthly: 12, yearly: 9 },
+		price: { monthly: 15, yearly: 12 },
 		features: [
 			"Unlimited Searches",
 			"5,000,000 AI Credits / month",
@@ -78,7 +78,7 @@ const plans: Plan[] = [
 	{
 		name: "Max",
 		info: "For power users & daily practice",
-		price: { monthly: 20, yearly: 16 },
+		price: { monthly: 30, yearly: 24 },
 		features: [
 			"Unlimited Searches",
 			"15,000,000 AI Credits / month",
