@@ -96,24 +96,24 @@ export function ThumbProgressCarousel({
       </Carousel>
 
       {/* Labeled progress bar navigation */}
-      <div className='absolute bottom-0 left-0 right-0 flex gap-2 px-5 pb-4'>
+      <div className='absolute bottom-0 left-0 right-0 flex flex-col sm:flex-row gap-1 sm:gap-2 px-3 sm:px-5 pb-3 sm:pb-4'>
         {items.map((item, idx) => (
           <button
             key={item.id}
             onClick={() => api?.scrollTo(idx)}
-            className='flex-1 flex flex-col gap-1 group/nav text-left'
+            className='flex flex-row items-center gap-2 sm:flex-1 sm:flex-col sm:items-start sm:gap-1 group/nav text-left w-full'
           >
             <span
               className={cn(
-                'text-[9px] sm:text-[10px] font-bold uppercase tracking-widest truncate transition-colors duration-200',
+                'text-[9px] sm:text-[10px] font-bold uppercase tracking-widest whitespace-nowrap sm:truncate transition-colors duration-200 shrink-0',
                 idx === current
                   ? 'text-white'
                   : 'text-white/40 group-hover/nav:text-white/70'
               )}
-              >
+            >
               {item.title}
             </span>
-            <div className='h-0.5 w-full bg-white/20 rounded-full overflow-hidden'>
+            <div className='h-0.5 flex-1 sm:w-full bg-white/20 rounded-full overflow-hidden'>
               {idx === current ? (
                 <div
                   className='h-full bg-orange-400 rounded-full transition-none'

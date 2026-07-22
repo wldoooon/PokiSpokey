@@ -20,7 +20,7 @@ const Container = ({ children }: { children: React.ReactNode }) => (
 		<div className="relative w-full border-x flex-1 flex flex-col">
 			<Ellipses />
 			{/* Reduced internal padding to push Carousel closer to the inner frame lines */}
-			<div className="relative z-20 flex-1 w-full h-full flex flex-col py-10 px-1 sm:px-1.5 md:px-2">{children}</div>
+			<div className="relative z-20 flex-1 w-full h-full flex flex-col py-4 sm:py-10 px-1 sm:px-1.5 md:px-2">{children}</div>
 		</div>
 	</div>
 );

@@ -433,7 +433,8 @@ export function SearchBar() {
                                         pauseDuration={1500}
                                         showCursor={true}
                                         cursorCharacter="|"
-                                        className="text-[11px] sm:text-sm text-muted-foreground/50 font-normal whitespace-nowrap"
+                                        className="text-[11px] sm:text-sm text-muted-foreground/50 font-normal"
+                                        style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}
                                     />
                                 </div>
                             )}
