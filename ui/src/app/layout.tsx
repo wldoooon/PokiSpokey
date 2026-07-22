@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import TechnicalLattice from "@/components/TechnicalLattice";
 import AuthSync from "@/components/AuthSync"
+import { AnimationPauser } from "@/components/AnimationPauser"
 import { YouTubeErrorSuppressor } from "@/components/YouTubeErrorSuppressor";
 import { CookieBanner } from "@/components/CookieBanner";
 import FooterWrapper from "@/components/FooterWrapper";
@@ -59,6 +60,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         suppressHydrationWarning
       >
         <Script src="https://www.youtube.com/iframe_api" strategy="afterInteractive" />
+        <Script src="https://cdn.paddle.com/paddle/v2/paddle.js" strategy="afterInteractive" />
+        <Script id="paddle-init" strategy="afterInteractive">{`function initPaddle(){if(!window.Paddle)return;${process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT === 'sandbox' ? 'window.Paddle.Environment.set("sandbox");' : ''}window.Paddle.Initialize({token:"${process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN}"});}if(window.Paddle){initPaddle();}else{document.querySelector('script[src*="paddle.js"]').addEventListener('load',initPaddle);}`}</Script>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
@@ -67,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <QueryProvider>
             <AuthSync />
+            <AnimationPauser />
             <YouTubeErrorSuppressor />
             <CookieBanner />
             <ToastProvider position="bottom-right">

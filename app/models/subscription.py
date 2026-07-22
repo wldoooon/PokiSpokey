@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 class SubscriptionStatus(str, Enum):
     ACTIVE    = "active"      # paying and in good standing
-    ON_HOLD   = "on_hold"     # payment failed, Dodo retrying (dunning)
+    ON_HOLD   = "on_hold"     # payment failed / paused, Paddle dunning
     CANCELLED = "cancelled"   # user cancelled, access until current_period_end
     FAILED    = "failed"      # mandate creation failed — subscription never started
     EXPIRED   = "expired"     # period ended, access fully revoked
@@ -36,10 +36,10 @@ class Subscription(SQLModel, table=True):
         index=True,
     )
 
-    # Dodo identifiers
-    dodo_subscription_id: str = Field(unique=True, index=True)
-    dodo_customer_id: str = Field(index=True)
-    dodo_product_id: str = Field()
+    # Paddle identifiers
+    paddle_subscription_id: str = Field(unique=True, index=True)
+    paddle_customer_id: str = Field(index=True)
+    paddle_price_id: str = Field()
 
     # Plan info — denormalized for fast querying without joining product mappings
     plan: str = Field(index=True)           # "basic" / "pro" / "max"

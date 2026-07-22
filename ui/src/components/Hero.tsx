@@ -197,7 +197,7 @@ export function Hero() {
               <h1 className={cn("text-[clamp(3.5rem,8vw,4.5rem)] lg:text-7xl font-black text-foreground tracking-tighter leading-[0.85] mb-6 relative inline-block w-fit", carterOne.className)}>
                 {/* Mascot Behind Text - Anchored together using 'em' scaling */}
                 <span
-                  className="absolute -z-10 opacity-80 pointer-events-none transition-transform duration-1000 group-hover:scale-105 inline-block"
+                  className="absolute -z-10 opacity-80 pointer-events-none transition-transform duration-1000 group-hover:scale-105 max-sm:hidden"
                   style={{
                     width: '6em',
                     height: '6em',
@@ -365,20 +365,6 @@ export function Hero() {
                           <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/80" />
                         </div>
 
-                        {/* Bottom Content */}
-                        <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7">
-                          {/* Checkmark tags */}
-                          <div className="flex flex-wrap gap-2 mb-3">
-                            {cat.tags.map((tag) => (
-                              <span key={tag} className="flex items-center gap-1 text-[11px] font-semibold text-white bg-white/15 backdrop-blur-sm border border-white/20 px-2.5 py-1 rounded-full">
-                                <svg className="w-3 h-3 shrink-0" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                          <h3 className={cn("text-3xl sm:text-4xl font-black text-white uppercase tracking-tight mb-1.5", carterOne.className)}>{cat.label}</h3>
-                          <p className="text-sm text-white/70 font-medium leading-snug">{cat.description}</p>
-                        </div>
 
                         {/* Active border glow */}
                         {isActive && (

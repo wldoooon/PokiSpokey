@@ -20,8 +20,8 @@ class WebhookEvent(SQLModel, table=True):
         nullable=False,
     )
 
-    # Dodo's own event ID — used to detect and reject duplicate webhooks
-    dodo_event_id: str = Field(unique=True, index=True)
+    # Paddle's own event ID — used to detect and reject duplicate webhooks
+    paddle_event_id: str = Field(unique=True, index=True)
 
     # What happened — e.g. "subscription.active", "subscription.cancelled"
     event_type: str = Field(index=True)
@@ -42,9 +42,9 @@ class WebhookEvent(SQLModel, table=True):
         index=True,
     )
 
-    # Raw Dodo subscription ID — stored separately so we have it even if
+    # Raw Paddle subscription ID — stored separately so we have it even if
     # linking to our subscription row fails
-    dodo_subscription_id: str | None = Field(default=None)
+    paddle_subscription_id: str | None = Field(default=None)
 
     # Full raw JSON from Dodo — invaluable for debugging and replaying events
     payload: str = Field(sa_column=Column(Text, nullable=False))

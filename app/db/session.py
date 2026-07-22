@@ -7,7 +7,7 @@ settings = get_settings()
 
 engine = create_async_engine(
     settings.postgres_url,
-    echo=True,
+    echo=False,
     future=True,
     pool_size=10,
     max_overflow=20,

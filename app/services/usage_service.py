@@ -329,14 +329,21 @@ async def reset_ai_credits(db: AsyncSession, user: User, tier: UserTier) -> None
 
 
 async def reset_search_limit(db: AsyncSession, user: User, tier: UserTier) -> None:
-    """Set per-user monthly search quota to the tier's allocation. Called on subscription events."""
+    """Reset search count to 0 and set quota to the tier's allocation. Called on subscription events."""
     from sqlalchemy import update as sa_update
+    from ..core.redis import get_redis
     new_limit = MONTHLY_SEARCH_LIMITS.get(tier, MONTHLY_SEARCH_LIMITS[UserTier.FREE])
     await db.execute(
         sa_update(UserUsage)
         .where(UserUsage.user_id == user.id)
-        .values(total_searches=new_limit)
+        .values(total_searches=new_limit, searches_count=0)
     )
+    try:
+        redis = await get_redis()
+        redis_key = _get_redis_key(f"user:{user.id}", "search")
+        await redis.delete(redis_key)
+    except Exception:
+        pass
     logger.info(f"[Search] Reset search limit for user {user.id} → {new_limit} ({tier})")
 
 
@@ -407,6 +414,14 @@ async def deduct_ai_credits(db: AsyncSession, user: User, total_tokens_used: int
         db.add(usage)
         await db.commit()
         await db.refresh(usage)
+
+        # Mark dirty so sync job resets credits next month for free users
+        try:
+            from ..core.redis import get_redis
+            r = await get_redis()
+            await r.sadd("usage:dirty_users", str(user.id))
+        except Exception:
+            pass
 
         logger.info(
             f"[AI Credits] Deducted {total_tokens_used} tokens from user {user.id}. "

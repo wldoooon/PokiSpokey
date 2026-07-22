@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSearchStore } from "@/stores/use-search-store";
 import { useUsageStore } from "@/stores/usage-store";
 import { Button } from "@/components/ui/button";
@@ -237,7 +238,6 @@ export function AiCompletion({
     // Ref-based blur gradients — fixes the duplicate global ID bug when two instances render
     const topBlurRef = useRef<HTMLDivElement>(null);
     const bottomBlurRef = useRef<HTMLDivElement>(null);
-    const [maxResponseHeight, setMaxResponseHeight] = useState<number>(400);
     const [canScroll, setCanScroll] = useState(false);
 
     const {
@@ -258,6 +258,12 @@ export function AiCompletion({
     } = useResponseHistory();
 
     branchesRef.current = branches;
+
+    // Portal anchor in the mobile tab bar — renders History button next to Player/AI tabs
+    const [historyPortalEl, setHistoryPortalEl] = useState<Element | null>(null);
+    useLayoutEffect(() => {
+        setHistoryPortalEl(document.getElementById("ai-history-portal"));
+    }, []);
 
     // Copy Logic
     const copyButtonRef = useRef<HTMLButtonElement>(null);
@@ -321,30 +327,6 @@ export function AiCompletion({
     }, [isLoading, completion, currentBranch]);
 
     useEffect(() => {
-        const calculateMaxHeight = () => {
-            const container = responseContainerRef.current?.closest('.flex.flex-col') as HTMLElement;
-            if (!container) return;
-
-            const containerHeight = container.clientHeight;
-            const header = container.querySelector('header');
-            const footer = container.querySelector('footer');
-            const suggestions = container.querySelector('[class*="suggestions"]');
-
-            const headerHeight = header?.clientHeight || 0;
-            const footerHeight = footer?.clientHeight || 0;
-            const suggestionsHeight = !shouldHideSuggestions && suggestions?.clientHeight || 0;
-            const extraBuffer = totalBranches > 1 ? 180 : 100;
-
-            const availableSpace = containerHeight - headerHeight - footerHeight - suggestionsHeight - extraBuffer;
-            setMaxResponseHeight(Math.max(120, Math.min(availableSpace, 600)));
-        };
-
-        calculateMaxHeight();
-        window.addEventListener('resize', calculateMaxHeight);
-        return () => window.removeEventListener('resize', calculateMaxHeight);
-    }, [shouldHideSuggestions, totalBranches]);
-
-    useEffect(() => {
         const checkScrollable = () => {
             if (scrollContentRef.current) {
                 const { scrollHeight, clientHeight } = scrollContentRef.current;
@@ -359,7 +341,7 @@ export function AiCompletion({
             clearTimeout(timeout);
             window.removeEventListener('resize', checkScrollable);
         };
-    }, [completion, currentBranch, maxResponseHeight, isLoading]);
+    }, [completion, currentBranch, isLoading]);
 
     const handleSuggestionClick = (suggestion: SmartSuggestion) => {
         if (outOfSparks) return;
@@ -490,8 +472,9 @@ export function AiCompletion({
         <div className="relative w-full h-full flex flex-col bg-card overflow-hidden">
             <div className="pointer-events-none absolute inset-0 dark:bg-[radial-gradient(20%_30%_at_85%_0%,--theme(--color-foreground/.1),transparent)]" />
 
-            <header className="relative w-full flex-shrink-0 px-4 pt-4 sm:px-6 sm:pt-5">
-                <div className="absolute right-0 top-0 z-20">
+            {/* Portal History button into mobile tab bar; show inline only on desktop */}
+            {historyPortalEl
+                ? createPortal(
                     <SessionSelector
                         sessions={sessions}
                         activeSessionId={activeSessionId}
@@ -501,10 +484,29 @@ export function AiCompletion({
                         currentQuery={query}
                         isLoading={isLoading}
                         isHistoryLoading={isHistoryLoading}
-                    />
-                </div>
+                        className="px-1.5 py-1 text-[10px] gap-1"
+                    />,
+                    historyPortalEl
+                )
+                : null
+            }
 
-             
+            <header className="relative w-full flex-shrink-0 px-4 pt-3 sm:px-6 sm:pt-5">
+                {/* Desktop-only: History button above title (mobile uses portal to tab bar) */}
+                {!historyPortalEl && (
+                    <div className="flex justify-end mb-1">
+                        <SessionSelector
+                            sessions={sessions}
+                            activeSessionId={activeSessionId}
+                            onSelectSession={handleSessionSelect}
+                            onDeleteSession={deleteSession}
+                            onClearAll={clearHistory}
+                            currentQuery={query}
+                            isLoading={isLoading}
+                            isHistoryLoading={isHistoryLoading}
+                        />
+                    </div>
+                )}
 
                 <h1 className="text-base sm:text-lg font-semibold text-foreground text-center leading-snug">
                     {query ? (
@@ -523,7 +525,7 @@ export function AiCompletion({
                 </div>
             </header>
 
-            <main className="w-full flex-1 flex flex-col mt-3 sm:mt-6 space-y-4 sm:space-y-6 min-h-0 overflow-y-auto px-4 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <main className="w-full flex-1 flex flex-col mt-3 sm:mt-6 space-y-4 sm:space-y-6 min-h-0 px-4 sm:px-6">
                 {/* Suggestions */}
                 <AnimatePresence>
                     {!shouldHideSuggestions && (
@@ -596,14 +598,14 @@ export function AiCompletion({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ duration: 0.5 }}
-                            className="w-full"
+                            className="w-full flex-1 flex flex-col min-h-0"
                         >
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="font-mono text-[9px] tracking-[0.25em] text-muted-foreground/30 uppercase shrink-0">Response</span>
                                 <div className="h-px flex-1 bg-border/30" />
                             </div>
-                            <div ref={responseContainerRef} className="relative text-left">
-                                <div className="relative">
+                            <div ref={responseContainerRef} className="relative text-left flex-1 flex flex-col min-h-0">
+                                <div className="relative flex-1 flex flex-col min-h-0">
                                     {/* Top blur gradient — ref-based, safe with multiple instances */}
                                     {canScroll && (
                                         <div
@@ -614,8 +616,7 @@ export function AiCompletion({
 
                                     <div
                                         ref={scrollContentRef}
-                                        style={{ maxHeight: `${maxResponseHeight}px` }}
-                                        className="overflow-y-auto overflow-x-hidden text-card-foreground pl-1 pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
+                                        className="flex-1 overflow-y-auto overflow-x-hidden text-card-foreground pl-1 pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
                                         onScroll={(e) => {
                                             const el = e.currentTarget;
                                             if (topBlurRef.current) {
@@ -703,18 +704,6 @@ export function AiCompletion({
                                     )}
                                 </div>
 
-                                {!isLoading && !error && totalBranches > 1 && (
-                                    <div className="mt-4 pt-4 border-t">
-                                        <BranchTimeline
-                                            currentIndex={currentIndex}
-                                            branches={branches}
-                                            onSelectIndex={navigateToIndex}
-                                            onPrevious={goToPrevious}
-                                            onNext={goToNext}
-                                            isLoading={isLoading}
-                                        />
-                                    </div>
-                                )}
                             </div>
                         </motion.div>
                     )}
@@ -722,6 +711,19 @@ export function AiCompletion({
             </main>
 
             <footer className="relative w-full flex-shrink-0 mt-auto px-4 pb-4 sm:px-6 sm:pb-6 pt-4">
+                {!isLoading && !error && totalBranches > 1 && (
+                    <div className="mb-2">
+                        <BranchTimeline
+                            currentIndex={currentIndex}
+                            branches={branches}
+                            onSelectIndex={navigateToIndex}
+                            onPrevious={goToPrevious}
+                            onNext={goToNext}
+                            isLoading={isLoading}
+                        />
+                    </div>
+                )}
+
                 <div className="absolute top-0 left-0 right-0 flex h-px">
                     <div className="w-1/2 bg-gradient-to-r from-transparent to-border"></div>
                     <div className="w-1/2 bg-gradient-to-l from-transparent to-border"></div>

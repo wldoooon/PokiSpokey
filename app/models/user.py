@@ -64,8 +64,8 @@ class User(UserBase, table=True):
     # Onboarding — flipped to True the first time the user sees the search tour
     is_tour_seen: bool = Field(default=False)
 
-    # Dodo billing — customer identity only (permanent, survives cancellation/resubscription)
-    dodo_customer_id: str | None = Field(default=None, index=True, unique=True)
+    # Paddle billing — customer identity only (permanent, survives cancellation/resubscription)
+    paddle_customer_id: str | None = Field(default=None, index=True, unique=True)
 
     # Timestamps (with timezone support)
     created_at: datetime = Field(

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useEffect, memo } from "react"
+import { useMemo, useEffect, useState, memo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Skeleton } from "@/components/ui/skeleton"
 import { usePlayerStore } from "@/stores/use-player-store"
@@ -76,6 +76,19 @@ export const TranscriptBox = ({
   onExplainWordInContext,
   onTranscriptDetermined,
 }: TranscriptBoxProps) => {
+  // Detect available screen height to show 1, 2, or 3 transcript sentences on mobile.
+  // Tall phones (iPhone XR/11+) have room for prev/next; small phones only show the active one.
+  const [visibleRows, setVisibleRows] = useState(1)
+  useEffect(() => {
+    const update = () => {
+      const h = window.innerHeight
+      setVisibleRows(h >= 850 ? 3 : h >= 720 ? 2 : 1)
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
   const targetIdx = useMemo(() => {
     if (!targetSentence) return -1
     return sentences.findIndex(s => s === targetSentence || s.start_time === targetSentence.start_time)
@@ -192,7 +205,7 @@ export const TranscriptBox = ({
             >
               {/* Previous */}
               {trio.prev && (
-                <div className="flex flex-col items-center gap-1 w-full hidden sm:flex">
+                <div className={cn("flex-col items-center gap-1 w-full", visibleRows >= 2 ? "flex" : "hidden sm:flex")}>
                   <SentenceGroup
                     group={[trio.prev]}
                     searchQuery={searchQuery}
@@ -232,7 +245,7 @@ export const TranscriptBox = ({
 
               {/* Next */}
               {trio.next && (
-                <div className="flex flex-col items-center gap-1 w-full hidden sm:flex">
+                <div className={cn("flex-col items-center gap-1 w-full", visibleRows >= 3 ? "flex" : "hidden sm:flex")}>
                   <SentenceGroup
                     group={[trio.next]}
                     searchQuery={searchQuery}

@@ -57,6 +57,7 @@ export function useLoginMutation() {
       return res.data;
     },
     onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: ["billing"] });
       await queryClient.refetchQueries({ queryKey: ["me"] });
       await triggerTourIfNew(queryClient);
       toastManager.add({ title: "Welcome back!", type: "success" });
@@ -75,6 +76,7 @@ export function useLogoutMutation() {
     onSuccess: () => {
       // setQueryData immediately marks user as null — no refetch triggered
       queryClient.setQueryData(["me"], null);
+      queryClient.removeQueries({ queryKey: ["billing"] });
       toastManager.add({ title: "Signed out successfully", type: "info" });
     },
   });
@@ -138,6 +140,7 @@ export function useVerifyEmailMutation() {
       return res.data;
     },
     onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: ["billing"] });
       await queryClient.refetchQueries({ queryKey: ["me"] });
       await triggerTourIfNew(queryClient);
       toastManager.add({ title: "Email verified!", description: "Welcome aboard — you're all set.", type: "success" });

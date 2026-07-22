@@ -44,8 +44,8 @@ class Invoice(SQLModel, table=True):
         index=True,
     )
 
-    # Dodo's own payment identifier
-    dodo_payment_id: str = Field(unique=True, index=True)
+    # Paddle's transaction identifier
+    paddle_transaction_id: str = Field(unique=True, index=True)
 
     # Payment amount — always stored in cents to avoid float precision issues
     # Example: $12.00 → stored as 1200
@@ -71,7 +71,7 @@ class Invoice(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True))
     )
 
-    # PDF invoice URL from Dodo (available after payment.succeeded)
+    # PDF invoice URL from Paddle (fetched via GET /transactions/{id}/invoice after transaction.completed)
     invoice_url: str | None = Field(default=None)
 
     # When the payment happened — used for sorting billing history in UI

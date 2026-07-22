@@ -10,10 +10,11 @@ const SENTENCES = [
     keywordIdx: 1,
     source: "Movies",
     lang: "EN",
+    flag: "https://flagcdn.com/us.svg",
     translations: [
-      { text: "Plus tu te tais, plus tu entends.", lang: "FR" },
-      { text: "Cuanto más callado estás, más escuchas.", lang: "ES" },
-      { text: "Je stiller du wirst, desto mehr hörst du.", lang: "DE" },
+      { text: "Plus tu te tais, plus tu entends.", lang: "FR", flag: "https://flagcdn.com/fr.svg" },
+      { text: "Cuanto más callado estás, más escuchas.", lang: "ES", flag: "https://flagcdn.com/es.svg" },
+      { text: "Je stiller du wirst, desto mehr hörst du.", lang: "DE", flag: "https://flagcdn.com/de.svg" },
     ],
   },
   {
@@ -21,10 +22,11 @@ const SENTENCES = [
     keywordIdx: 2,
     source: "News",
     lang: "FR",
+    flag: "https://flagcdn.com/fr.svg",
     translations: [
-      { text: "Paris is always a good idea.", lang: "EN" },
-      { text: "París siempre es una buena idea.", lang: "ES" },
-      { text: "Paris ist immer eine gute Idee.", lang: "DE" },
+      { text: "Paris is always a good idea.", lang: "EN", flag: "https://flagcdn.com/us.svg" },
+      { text: "París siempre es una buena idea.", lang: "ES", flag: "https://flagcdn.com/es.svg" },
+      { text: "Paris ist immer eine gute Idee.", lang: "DE", flag: "https://flagcdn.com/de.svg" },
     ],
   },
   {
@@ -32,10 +34,11 @@ const SENTENCES = [
     keywordIdx: 2,
     source: "Podcasts",
     lang: "ES",
+    flag: "https://flagcdn.com/es.svg",
     translations: [
-      { text: "Don't cry, smile because it happened.", lang: "EN" },
-      { text: "Ne pleure pas, souris parce que c'est arrivé.", lang: "FR" },
-      { text: "Wein nicht, lächle, weil es passiert ist.", lang: "DE" },
+      { text: "Don't cry, smile because it happened.", lang: "EN", flag: "https://flagcdn.com/us.svg" },
+      { text: "Ne pleure pas, souris parce que c'est arrivé.", lang: "FR", flag: "https://flagcdn.com/fr.svg" },
+      { text: "Wein nicht, lächle, weil es passiert ist.", lang: "DE", flag: "https://flagcdn.com/de.svg" },
     ],
   },
 ]
@@ -101,9 +104,12 @@ const ArticlePreviewCard = () => {
           style={{ backgroundImage: "radial-gradient(currentColor 1px, transparent 1px)", backgroundSize: "20px 20px" }}
         />
 
-        {/* Language pill — top right */}
-        <div className="absolute top-4 right-5 px-2.5 py-0.5 rounded-full border border-border/35 bg-muted/20 text-[9px] font-mono tracking-widest uppercase text-muted-foreground/50 select-none">
-          {sentence.lang}
+        {/* Language flag + source — inline above sentence */}
+        <div className="flex items-center gap-2 z-10">
+          <div className="h-5 w-5 rounded-full overflow-hidden border-2 border-background shadow-md bg-muted flex-shrink-0">
+            <img src={sentence.flag} className="w-full h-full object-cover" alt={sentence.lang} />
+          </div>
+          <span className="text-[10px] text-muted-foreground/50 font-mono tracking-wide">{sentence.source}</span>
         </div>
 
         {/* Sentence with jumping word highlight */}
@@ -114,7 +120,7 @@ const ArticlePreviewCard = () => {
               className={cn(
                 "mr-0.5 px-1 py-0.5 border-2 rounded-md transition-all duration-150 ease-out inline-flex items-center text-sm font-medium",
                 i === wordIdx && phase === 'words'
-                  ? "bg-primary/20 border-primary text-foreground font-bold scale-105 shadow-[0_0_14px_-3px_hsl(var(--primary)/0.4)]"
+                  ? "border-primary text-foreground font-bold scale-105"
                   : "border-transparent text-foreground/65"
               )}
             >
@@ -134,9 +140,9 @@ const ArticlePreviewCard = () => {
               transition={{ duration: 0.35, ease: "easeInOut" }}
               className="flex items-center gap-2"
             >
-              <span className="font-mono text-[9px] border border-border/50 bg-muted/40 px-1.5 py-0.5 rounded text-muted-foreground tracking-widest uppercase">
-                {sentence.translations[translationIdx].lang}
-              </span>
+              <div className="h-5 w-5 rounded-full overflow-hidden border-2 border-background shadow-md bg-muted flex-shrink-0">
+                <img src={sentence.translations[translationIdx].flag} className="w-full h-full object-cover" alt={sentence.translations[translationIdx].lang} />
+              </div>
               <span className="text-xs text-muted-foreground">
                 {sentence.translations[translationIdx].text}
               </span>
@@ -144,10 +150,6 @@ const ArticlePreviewCard = () => {
           </AnimatePresence>
         </div>
 
-        {/* Source badge */}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-border/30 bg-background/60 backdrop-blur-sm select-none">
-          <span className="text-[10px] text-muted-foreground/50 font-mono">{sentence.source}</span>
-        </div>
 
       </div>
 

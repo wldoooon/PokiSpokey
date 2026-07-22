@@ -538,101 +538,99 @@ export default function AudioCard({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {currentClip?.category && (
-            <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/30 border border-border/20 px-1.5 py-0.5 rounded-sm">
+            <span className="text-[7px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/30 border border-border/20 px-1 sm:px-1.5 py-0.5 rounded-sm">
               {typeof currentClip.category === "string"
                 ? currentClip.category
                 : (currentClip.category as any)?.title ?? (currentClip.category as any)?.type ?? ""}
             </span>
           )}
-          <span className="text-[10px] font-medium text-muted-foreground/50 tabular-nums">
+          <span className="text-[8px] sm:text-[10px] font-medium text-muted-foreground/50 tabular-nums">
             {currentVideoIndex + 1}<span className="opacity-40 mx-0.5">/</span>{(totalItems ?? playlist.length) > 100 ? "+100" : (totalItems || playlist.length)}
           </span>
         </div>
       </div>
 
       {/* ── MOBILE COMPACT CONTROLS (< md) ── */}
-      <div className="md:hidden flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
+      <div className="md:hidden flex flex-col gap-2">
+        {/* Row 1: Transport + Translation */}
+        <div className="flex items-center justify-center gap-3 relative">
+          {isThrottled && <SpamGuardOverlay cooldownLeft={cooldownLeft} />}
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => guardedAction(prevVideo)} disabled={currentVideoIndex === 0}>
+            <SkipBack size={15} />
+          </Button>
+          <Button size="icon" className="h-10 w-10 rounded-full" onClick={() => guardedAction(togglePlayPause)}>
+            {isPlaying ? <Pause size={17} /> : <Play size={17} className="ml-0.5" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 relative"
+            onClick={() => guardedAction(nextVideo)}
+            disabled={nextCooldown > 0 || isAtEnd || isWaitingForNextPage}
+          >
+            {nextCooldown > 0 ? (
+              <span className="text-[10px] font-black text-primary animate-pulse">{nextCooldown}s</span>
+            ) : isWaitingForNextPage ? (
+              <Loader2 size={13} className="animate-spin text-muted-foreground" />
+            ) : isAtEnd ? (
+              <span className="text-[10px] font-bold text-muted-foreground">End</span>
+            ) : (
+              <SkipForward size={15} />
+            )}
+          </Button>
+          <Popover open={mobileTranslationOpen} onOpenChange={setMobileTranslationOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn("relative overflow-hidden h-8 w-8 p-0 cursor-pointer rounded-full", translationLang ? "bg-muted text-foreground" : "")}
+              >
+                <div className="usage-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-black/8 to-transparent dark:via-white/10" />
+                {translationLang
+                  ? <FlagImg url={TRANSLATION_LANGUAGES.find(l => l.code === translationLang)?.flagUrl ?? ""} alt={translationLang} />
+                  : <Globe size={14} />
+                }
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[260px] p-4 rounded-2xl" side="top" align="center">
+              <TranslationPicker current={translationLang} onSelect={setTranslationLang} />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Row 2: Secondary controls */}
+        <div className="flex items-center justify-around">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
-                <Volume2 size={18} className="text-muted-foreground" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
+                <Volume2 size={14} className="text-muted-foreground" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-40 p-3 rounded-xl" side="top">
               <Slider value={[volume]} max={100} onValueChange={(val) => setVolume(val[0])} />
             </PopoverContent>
           </Popover>
-
-          <div className="flex items-center justify-center gap-1 flex-1 relative">
-            {isThrottled && <SpamGuardOverlay cooldownLeft={cooldownLeft} />}
-            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => guardedAction(prevVideo)} disabled={currentVideoIndex === 0}>
-              <SkipBack size={16} />
-            </Button>
-            <Button size="icon" className="h-10 w-10 rounded-full" onClick={() => guardedAction(togglePlayPause)}>
-              {isPlaying ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 relative"
-              onClick={() => guardedAction(nextVideo)}
-              disabled={nextCooldown > 0 || isAtEnd || isWaitingForNextPage}
-            >
-              {nextCooldown > 0 ? (
-                <span className="text-[10px] font-black text-primary animate-pulse">{nextCooldown}s</span>
-              ) : isWaitingForNextPage ? (
-                <Loader2 size={14} className="animate-spin text-muted-foreground" />
-              ) : isAtEnd ? (
-                <span className="text-[10px] font-bold text-muted-foreground">End</span>
-              ) : (
-                <SkipForward size={16} />
-              )}
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-9 w-9", targetSentence ? "text-primary" : "")}
-              onClick={() => guardedAction(repeatTargetSentence)}
-              disabled={!targetSentence}
-            >
-              <Repeat size={16} />
-            </Button>
-            <Popover open={mobileSpeedOpen} onOpenChange={setMobileSpeedOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-9 px-2 gap-1 font-bold text-xs">
-                  {rate}x
-                  {mobileSpeedOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-32 p-1 rounded-xl" side="top" align="end">
-                <SpeedPicker currentRate={rate} onSelect={(r) => { setRate(r); setPlaybackRate(r) }} />
-              </PopoverContent>
-            </Popover>
-            <Popover open={mobileTranslationOpen} onOpenChange={setMobileTranslationOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn("relative overflow-hidden h-9 px-2 gap-1.5 cursor-pointer", translationLang ? "bg-muted text-foreground" : "")}
-                >
-                  <div className="usage-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-black/8 to-transparent dark:via-white/10" />
-                  {translationLang
-                    ? <FlagImg url={TRANSLATION_LANGUAGES.find(l => l.code === translationLang)?.flagUrl ?? ""} alt={translationLang} />
-                    : <Globe size={15} />
-                  }
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[260px] p-4 rounded-2xl" side="top" align="end">
-                <TranslationPicker current={translationLang} onSelect={setTranslationLang} />
-              </PopoverContent>
-            </Popover>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-7 w-7", targetSentence ? "text-primary" : "")}
+            onClick={() => guardedAction(repeatTargetSentence)}
+            disabled={!targetSentence}
+          >
+            <Repeat size={14} />
+          </Button>
+          <Popover open={mobileSpeedOpen} onOpenChange={setMobileSpeedOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 px-1.5 gap-0.5 font-bold text-[11px]">
+                {rate}x
+                {mobileSpeedOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-32 p-1 rounded-xl" side="top" align="center">
+              <SpeedPicker currentRate={rate} onSelect={(r) => { setRate(r); setPlaybackRate(r) }} />
+            </PopoverContent>
+          </Popover>
         </div>
-
       </div>
 
       {/* ── DESKTOP FULL CONTROLS (>= md) ── */}

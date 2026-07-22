@@ -8,13 +8,14 @@ from ..models.user import User
 from ..models.subscription import Subscription
 from ..models.invoice import Invoice
 from ..core.logging import logger
-from ..core.dodo import dodo_client
 from ..services.billing import (
-    create_checkout_url,
+    create_checkout_transaction,
     handle_webhook,
     cancel_subscription,
     reactivate_subscription,
     change_subscription_plan,
+    verify_paddle_signature,
+    create_portal_session,
 )
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -42,21 +43,22 @@ class UpgradeRequest(BaseModel):
 async def checkout(
     body: CheckoutRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
 ):
     """
-    Creates a Dodo checkout session for the given product.
-    Returns the URL to redirect the user to — payment happens on Dodo's page.
-
-    The actual plan upgrade does NOT happen here.
-    It happens when Dodo fires the subscription.active webhook.
+    Creates a Paddle transaction for the given product.
+    Returns the transaction_id — the frontend uses Paddle.js to open the
+    checkout overlay. The actual plan upgrade happens when Paddle fires
+    the subscription.activated webhook.
     """
     try:
-        url = await create_checkout_url(
+        transaction_id = await create_checkout_transaction(
             user=current_user,
             plan=body.plan,
             billing_period=body.billing_period,
+            db=db,
         )
-        return {"checkout_url": url}
+        return {"transaction_id": transaction_id}
     except Exception as e:
         logger.error(f"[BILLING] Checkout creation failed: {e}")
         raise HTTPException(status_code=502, detail="Failed to create checkout session.")
@@ -106,7 +108,7 @@ async def get_invoices(
         "invoices": [
             {
                 "id": str(inv.id),
-                "dodo_payment_id": inv.dodo_payment_id,
+                "transaction_id": inv.paddle_transaction_id,
                 "date": inv.created_at.isoformat(),
                 "description": f"{inv.plan.capitalize()} · {inv.billing_period.capitalize()}",
                 "amount": inv.amount,
@@ -119,6 +121,39 @@ async def get_invoices(
     }
 
 
+# ── Invoice PDF ───────────────────────────────────────────────────────────────
+
+@router.get("/invoices/{transaction_id}/pdf")
+async def get_invoice_pdf(
+    transaction_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    # Verify the invoice belongs to this user
+    result = await db.execute(
+        select(Invoice).where(
+            Invoice.paddle_transaction_id == transaction_id,
+            Invoice.user_id == current_user.id,
+        )
+    )
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Invoice not found.")
+    try:
+        import asyncio
+        from ..core.paddle import paddle_client
+        from paddle_billing.Entities.Shared import Disposition
+        from paddle_billing.Resources.Transactions.Operations import GetTransactionInvoice
+        inv_pdf = await asyncio.to_thread(
+            paddle_client.get().transactions.get_invoice_pdf,
+            transaction_id,
+            GetTransactionInvoice(disposition=Disposition.Inline),
+        )
+        return {"url": inv_pdf.url if inv_pdf else None}
+    except Exception as e:
+        logger.error(f"[BILLING] Failed to fetch invoice PDF for {transaction_id}: {e}")
+        raise HTTPException(status_code=502, detail="Could not fetch invoice PDF.")
+
+
 # ── Cancel Subscription ──────────────────────────────────────────────────────
 
 @router.post("/cancel")
@@ -128,7 +163,7 @@ async def cancel(
     db: AsyncSession = Depends(get_session),
 ):
     try:
-        await cancel_subscription(user=current_user, db=db)
+        await cancel_subscription(user=current_user, db=db, reason=body.reason)
         return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -170,32 +205,64 @@ async def upgrade_plan(
 @router.get("/payment-methods")
 async def get_payment_methods(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
 ):
-    if not current_user.dodo_customer_id:
+    result = await db.execute(
+        select(Subscription).where(Subscription.user_id == current_user.id)
+    )
+    sub = result.scalars().first()
+    if not sub or not sub.paddle_subscription_id:
         return {"payment_methods": []}
     try:
-        resp = await dodo_client.get().customers.retrieve_payment_methods(
-            current_user.dodo_customer_id
+        import asyncio
+        from ..core.paddle import paddle_client
+        from paddle_billing.Resources.Transactions.Operations import ListTransactions
+
+        txns_page = await asyncio.to_thread(
+            paddle_client.get().transactions.list,
+            ListTransactions(subscription_ids=[sub.paddle_subscription_id]),
         )
-        methods = []
-        for item in (resp.items or []):
-            if item.payment_method != "card" or not item.card:
+        for txn in txns_page:
+            if not txn.payments:
                 continue
-            methods.append({
-                "payment_method_id": item.payment_method_id,
-                "card_holder_name": item.card.card_holder_name,
-                "card_network": (item.card.card_network or "").lower(),
-                "card_type": (item.card.card_type or "").lower(),
-                "expiry_month": item.card.expiry_month,
-                "expiry_year": item.card.expiry_year,
-                "last4": item.card.last4_digits,
-                "recurring_enabled": item.recurring_enabled,
-                "last_used_at": item.last_used_at.isoformat() if item.last_used_at else None,
-            })
-        return {"payment_methods": methods}
+            for payment in txn.payments:
+                method = payment.method_details
+                if method and method.type == "card" and method.card:
+                    return {
+                        "payment_methods": [{
+                            "payment_method_id": None,
+                            "card_holder_name": method.card.cardholder_name or "",
+                            "card_network": (method.card.type.value if method.card.type else "").lower(),
+                            "last4": method.card.last4,
+                            "expiry_month": method.card.expiry_month,
+                            "expiry_year": method.card.expiry_year,
+                        }]
+                    }
+        return {"payment_methods": []}
     except Exception as e:
-        logger.error(f"[BILLING] Failed to fetch payment methods for user {current_user.id}: {e}")
-        raise HTTPException(status_code=502, detail="Failed to fetch payment methods.")
+        logger.error(f"[BILLING] Failed to fetch payment methods for user {current_user.id}: {e}", exc_info=True)
+        return {"payment_methods": []}
+
+
+# ── Customer Portal Session ───────────────────────────────────────────────────
+
+@router.post("/portal-session")
+async def get_portal_session(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Creates a Paddle customer portal session and returns an authenticated
+    URL for the user to update their payment method.
+    """
+    try:
+        url = await create_portal_session(user=current_user, db=db)
+        return {"url": url}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[BILLING] Portal session failed for user {current_user.id}: {e}")
+        raise HTTPException(status_code=502, detail="Failed to create portal session.")
 
 
 # ── Reactivate Subscription ──────────────────────────────────────────────────
@@ -217,37 +284,27 @@ async def reactivate(
 
 # ── Webhook ──────────────────────────────────────────────────────────────────
 
-@router.post("/webhooks/dodo", include_in_schema=False)
-async def dodo_webhook(
+@router.post("/webhooks/paddle", include_in_schema=False)
+async def paddle_webhook(
     request: Request,
     db: AsyncSession = Depends(get_session),
-    webhook_id: str = Header(..., alias="webhook-id"),
-    webhook_timestamp: str = Header(..., alias="webhook-timestamp"),
-    webhook_signature: str = Header(..., alias="webhook-signature"),
+    paddle_signature: str = Header(..., alias="Paddle-Signature"),
 ):
     raw_body = await request.body()
 
-    try:
-        dodo_client.get().webhooks.unwrap(
-            raw_body,
-            headers={
-                "webhook-id": webhook_id,
-                "webhook-signature": webhook_signature,
-                "webhook-timestamp": webhook_timestamp,
-            },
-        )
-    except Exception as e:
-        logger.warning(f"[WEBHOOK] Signature verification failed — id={webhook_id}: {e}")
+    if not verify_paddle_signature(raw_body, paddle_signature):
+        logger.warning("[WEBHOOK] Paddle signature verification failed")
         raise HTTPException(status_code=401, detail="Invalid webhook signature.")
 
     import json
     payload_dict = json.loads(raw_body)
-    event_type = payload_dict.get("type", "unknown")
+    event_type = payload_dict.get("event_type", "unknown")
+    event_id = payload_dict.get("notification_id", "unknown")
     data = payload_dict.get("data", {})
 
     try:
         await handle_webhook(
-            event_id=webhook_id,
+            event_id=event_id,
             event_type=event_type,
             data=data,
             raw_body=raw_body.decode("utf-8"),
