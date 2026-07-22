@@ -538,13 +538,13 @@ export default function AudioCard({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {currentClip?.category && (
-            <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/30 border border-border/20 px-1.5 py-0.5 rounded-sm">
+            <span className="text-[7px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/30 border border-border/20 px-1 sm:px-1.5 py-0.5 rounded-sm">
               {typeof currentClip.category === "string"
                 ? currentClip.category
                 : (currentClip.category as any)?.title ?? (currentClip.category as any)?.type ?? ""}
             </span>
           )}
-          <span className="text-[10px] font-medium text-muted-foreground/50 tabular-nums">
+          <span className="text-[8px] sm:text-[10px] font-medium text-muted-foreground/50 tabular-nums">
             {currentVideoIndex + 1}<span className="opacity-40 mx-0.5">/</span>{(totalItems ?? playlist.length) > 100 ? "+100" : (totalItems || playlist.length)}
           </span>
         </div>
