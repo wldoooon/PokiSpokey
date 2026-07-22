@@ -708,8 +708,8 @@ function AccountTab({ user }: { user: typeof MOCK_USER }) {
       {/* Danger zone */}
       <div className="rounded-2xl bg-orange-500/[0.06] px-5 py-4 space-y-3">
         <h3 className="text-sm font-bold text-orange-500">Danger zone</h3>
-        <div className="rounded-xl border border-border/50 bg-card px-4 py-3 flex items-center justify-between gap-4">
-          <div>
+        <div className="rounded-xl border border-border/50 bg-card px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">Delete account</p>
             <p className="text-xs text-muted-foreground mt-0.5">Permanently remove your account and all associated data.</p>
           </div>
@@ -1109,7 +1109,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
             <Skeleton className="h-8 w-24 rounded-xl" />
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div className="min-w-0">
               <p className="text-sm text-muted-foreground mb-1">Price</p>
               <p className="text-base font-semibold text-foreground">
@@ -1118,7 +1118,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
             </div>
             <div className="min-w-0">
               <p className="text-sm text-muted-foreground mb-1">Your plan</p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-base font-semibold text-foreground">{currentPlan.label}</p>
                 <Badge variant="outline" className={cn(
                   "text-[11px] font-semibold px-2.5 py-0.5 rounded-full self-center leading-none h-auto flex items-center gap-1",
@@ -1147,7 +1147,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
               <Button
                 variant="destructive"
                 size="sm"
-                className="rounded-xl text-sm cursor-pointer hover:bg-red-700 transition-colors shrink-0"
+                className="col-span-2 sm:col-span-1 rounded-xl text-sm cursor-pointer hover:bg-red-700 transition-colors shrink-0 w-full sm:w-auto"
                 onClick={() => setCancelOpen(true)}
               >
                 Cancel Plan
@@ -1328,7 +1328,7 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
 
       {/* Cancellation banner */}
       {sub?.cancel_at_period_end && sub?.current_period_end && (
-        <div className="flex items-center justify-between gap-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
           <div className="flex items-center gap-3">
             <TriangleAlert className="w-4 h-4 text-amber-500 shrink-0" />
             <p className="text-sm text-foreground">
@@ -1421,83 +1421,116 @@ function BillingTab({ user }: { user: typeof MOCK_USER }) {
           <p className="text-sm text-muted-foreground py-8 text-center">No invoices yet.</p>
         ) : filteredInvoices.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No invoices match the selected filters.</p>
-        ) : (
-          <div className="rounded-xl border border-border/40 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent border-border/40">
-                <TableHead className="text-xs font-semibold text-muted-foreground py-3 w-10">№</TableHead>
-                {[["Invoice ID"], ["Plan"], ["Cycle"], ["Billing date"], ["Amount"]].map(([col]) => (
-                  <TableHead key={col} className="text-xs font-semibold text-muted-foreground py-3">
-                    <span className="flex items-center gap-1">{col} <ChevronsUpDown className="w-3 h-3 opacity-50" /></span>
-                  </TableHead>
-                ))}
-                <TableHead className="text-xs font-semibold text-muted-foreground py-3">Status</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground py-3 text-right">Invoice</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredInvoices.map((inv, idx) => {
-                const [plan, cycle] = inv.description.split(" · ")
-                const statusConfig: Record<string, { label: string; className: string; icon: React.ComponentType<{ className?: string }> }> = {
-                  succeeded:                { label: "Paid",          className: "text-white bg-emerald-600 border-emerald-700", icon: CircleCheck },
-                  failed:                   { label: "Failed",        className: "text-white bg-red-600 border-red-700",         icon: CircleX },
-                  refunded:                 { label: "Refunded",      className: "text-white bg-amber-600 border-amber-700",     icon: RotateCcw },
-                  cancelled:                { label: "Cancelled",     className: "text-white bg-slate-600 border-slate-700",     icon: Ban },
-                  processing:               { label: "Processing",    className: "text-white bg-blue-600 border-blue-700",       icon: Loader2 },
-                  requires_customer_action: { label: "Action needed", className: "text-white bg-orange-600 border-orange-700",  icon: CircleAlert },
-                  requires_payment_method:  { label: "Update card",   className: "text-white bg-orange-600 border-orange-700",  icon: CircleAlert },
-                }
-                const statusInfo = statusConfig[inv.status] ?? { label: inv.status, className: "text-muted-foreground bg-muted/40 border-border/40", icon: CircleAlert }
-                return (
-                  <TableRow key={inv.id} className="border-border/30 hover:bg-muted/20 transition-colors">
-                    <TableCell className="text-sm text-muted-foreground py-4">{filteredInvoices.length - idx}</TableCell>
-                    <TableCell className="text-sm font-mono text-foreground py-4 tracking-wide">
-                      {inv.transaction_id ?? inv.id.slice(0, 12).toUpperCase()}
-                    </TableCell>
-                    <TableCell className="text-sm font-medium text-foreground py-4">{plan ?? "—"}</TableCell>
-                    <TableCell className="text-sm text-foreground py-4 capitalize">{cycle ?? "—"}</TableCell>
-                    <TableCell className="text-sm text-foreground py-4">
-                      {new Date(inv.date).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
-                    </TableCell>
-                    <TableCell className="text-sm font-medium tabular-nums text-foreground py-4">
-                      {(getPlanPrice(inv.description) ?? 0).toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                    </TableCell>
-                    <TableCell className="py-4">
-                      <Badge variant="outline" className={cn("inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full", statusInfo.className)}>
-                        <statusInfo.icon className="w-3 h-3" />
-                        {statusInfo.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right py-4">
+        ) : (() => {
+          const statusConfig: Record<string, { label: string; className: string; icon: React.ComponentType<{ className?: string }> }> = {
+            succeeded:                { label: "Paid",          className: "text-white bg-emerald-600 border-emerald-700", icon: CircleCheck },
+            failed:                   { label: "Failed",        className: "text-white bg-red-600 border-red-700",         icon: CircleX },
+            refunded:                 { label: "Refunded",      className: "text-white bg-amber-600 border-amber-700",     icon: RotateCcw },
+            cancelled:                { label: "Cancelled",     className: "text-white bg-slate-600 border-slate-700",     icon: Ban },
+            processing:               { label: "Processing",    className: "text-white bg-blue-600 border-blue-700",       icon: Loader2 },
+            requires_customer_action: { label: "Action needed", className: "text-white bg-orange-600 border-orange-700",  icon: CircleAlert },
+            requires_payment_method:  { label: "Update card",   className: "text-white bg-orange-600 border-orange-700",  icon: CircleAlert },
+          }
+          const downloadInvoice = async (transactionId: string) => {
+            try {
+              const { data } = await apiClient.get<{ url: string }>(`/billing/invoices/${transactionId}/pdf`)
+              if (data.url) window.open(data.url, "_blank")
+            } catch {
+              toastManager.add({ title: "Could not fetch invoice", type: "error" })
+            }
+          }
+          return (
+            <>
+              {/* Mobile card list */}
+              <div className="sm:hidden space-y-2">
+                {filteredInvoices.map((inv, idx) => {
+                  const [plan] = inv.description.split(" · ")
+                  const statusInfo = statusConfig[inv.status] ?? { label: inv.status, className: "text-muted-foreground bg-muted/40 border-border/40", icon: CircleAlert }
+                  return (
+                    <div key={inv.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/30 bg-muted/10 px-4 py-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-foreground">{plan ?? "—"}</span>
+                          <Badge variant="outline" className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full", statusInfo.className)}>
+                            <statusInfo.icon className="w-3 h-3" />
+                            {statusInfo.label}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
+                          {new Date(inv.date).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                          {" · "}
+                          {(getPlanPrice(inv.description) ?? 0).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                        </p>
+                      </div>
                       {inv.transaction_id ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 rounded-lg gap-1.5 text-xs px-2.5 cursor-pointer"
-                          onClick={async () => {
-                            try {
-                              const { data } = await apiClient.get<{ url: string }>(`/billing/invoices/${inv.transaction_id}/pdf`)
-                              if (data.url) window.open(data.url, "_blank")
-                            } catch {
-                              toastManager.add({ title: "Could not fetch invoice", type: "error" })
-                            }
-                          }}
-                        >
+                        <Button variant="ghost" size="sm" className="h-7 rounded-lg gap-1.5 text-xs px-2.5 cursor-pointer shrink-0" onClick={() => downloadInvoice(inv.transaction_id!)}>
                           <Download className="h-3 w-3" />
-                          View
+                          PDF
                         </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/40">—</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-          </div>
-        )}
+                      ) : <span className="text-xs text-muted-foreground/40 shrink-0">—</span>}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden sm:block rounded-xl border border-border/40 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-border/40">
+                      <TableHead className="text-xs font-semibold text-muted-foreground py-3 w-10">№</TableHead>
+                      {[["Invoice ID"], ["Plan"], ["Cycle"], ["Billing date"], ["Amount"]].map(([col]) => (
+                        <TableHead key={col} className="text-xs font-semibold text-muted-foreground py-3">
+                          <span className="flex items-center gap-1">{col} <ChevronsUpDown className="w-3 h-3 opacity-50" /></span>
+                        </TableHead>
+                      ))}
+                      <TableHead className="text-xs font-semibold text-muted-foreground py-3">Status</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground py-3 text-right">Invoice</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredInvoices.map((inv, idx) => {
+                      const [plan, cycle] = inv.description.split(" · ")
+                      const statusInfo = statusConfig[inv.status] ?? { label: inv.status, className: "text-muted-foreground bg-muted/40 border-border/40", icon: CircleAlert }
+                      return (
+                        <TableRow key={inv.id} className="border-border/30 hover:bg-muted/20 transition-colors">
+                          <TableCell className="text-sm text-muted-foreground py-4">{filteredInvoices.length - idx}</TableCell>
+                          <TableCell className="text-sm font-mono text-foreground py-4 tracking-wide">
+                            {inv.transaction_id ?? inv.id.slice(0, 12).toUpperCase()}
+                          </TableCell>
+                          <TableCell className="text-sm font-medium text-foreground py-4">{plan ?? "—"}</TableCell>
+                          <TableCell className="text-sm text-foreground py-4 capitalize">{cycle ?? "—"}</TableCell>
+                          <TableCell className="text-sm text-foreground py-4">
+                            {new Date(inv.date).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                          </TableCell>
+                          <TableCell className="text-sm font-medium tabular-nums text-foreground py-4">
+                            {(getPlanPrice(inv.description) ?? 0).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <Badge variant="outline" className={cn("inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full", statusInfo.className)}>
+                              <statusInfo.icon className="w-3 h-3" />
+                              {statusInfo.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right py-4">
+                            {inv.transaction_id ? (
+                              <Button variant="ghost" size="sm" className="h-7 rounded-lg gap-1.5 text-xs px-2.5 cursor-pointer" onClick={() => downloadInvoice(inv.transaction_id!)}>
+                                <Download className="h-3 w-3" />
+                                View
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/40">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )
+        })()}
       </div>
     </div>
   )
@@ -1565,12 +1598,12 @@ export function AccountInfoCard() {
       <div className="rounded-3xl border border-border/60 bg-card dark:bg-background shadow-sm">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           {/* Tab bar */}
-          <div className="pl-0 pr-4 bg-muted/40 flex w-full">
-            <TabsList className="bg-transparent p-0 h-auto gap-1 rounded-none flex items-end border-0 w-full">
+          <div className="pl-0 pr-2 sm:pr-4 bg-muted/40 flex w-full">
+            <TabsList className="bg-transparent p-0 h-auto gap-0.5 sm:gap-1 rounded-none flex items-end border-0 w-full">
               {[
-                { value: "account", label: "Account", soon: false },
-                { value: "security", label: "Security", soon: false },
-                { value: "billing", label: "Subscription & Billing", soon: false },
+                { value: "account", label: "Account", mobileLabel: "Account", soon: false },
+                { value: "security", label: "Security", mobileLabel: "Security", soon: false },
+                { value: "billing", label: "Subscription & Billing", mobileLabel: "Billing", soon: false },
               ].map((tab, i, arr) => {
                 const prevTab = arr[i - 1]
                 const isAfterActive = prevTab?.value === activeTab
@@ -1580,7 +1613,7 @@ export function AccountInfoCard() {
                     value={tab.value}
                     disabled={tab.soon}
                     className={cn(
-                      `relative px-5 pt-2.5 pb-2 text-sm transition-colors duration-150 -mb-px shadow-none ${i === 0 ? "rounded-tr-xl" : "rounded-t-xl"}`,
+                      `relative px-3 sm:px-5 pt-2.5 pb-2 text-xs sm:text-sm transition-colors duration-150 -mb-px shadow-none ${i === 0 ? "rounded-tr-xl" : "rounded-t-xl"}`,
                       "data-[state=active]:bg-card dark:data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:font-bold data-[state=active]:shadow-none data-[state=active]:z-10 data-[state=active]:border data-[state=active]:border-border/60 data-[state=active]:border-b-card dark:data-[state=active]:border-b-background",
                       i === 0 && "data-[state=active]:border-l-0",
                       "data-[state=inactive]:bg-transparent data-[state=inactive]:border-0 data-[state=inactive]:text-muted-foreground data-[state=inactive]:font-medium",
@@ -1595,7 +1628,8 @@ export function AccountInfoCard() {
                       </span>
                     )}
                     <span className="flex items-center gap-1.5">
-                      {tab.label}
+                      <span className="sm:hidden">{tab.mobileLabel}</span>
+                      <span className="hidden sm:inline">{tab.label}</span>
                       {tab.soon && (
                         <span className="text-[9px] font-semibold uppercase tracking-wide bg-muted border border-border/50 text-muted-foreground rounded-full px-1.5 py-0.5 leading-none">
                           Soon
@@ -1616,7 +1650,7 @@ export function AccountInfoCard() {
           </div>
 
           {/* Tab content */}
-          <div className="px-6 pt-5 pb-6 overflow-hidden">
+          <div className="px-4 sm:px-6 pt-5 pb-6 overflow-hidden">
             <AnimatePresence mode="wait" custom={directionRef.current}>
               <motion.div
                 key={activeTab}
