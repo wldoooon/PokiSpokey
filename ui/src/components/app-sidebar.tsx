@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
+import { cn } from "@/lib/utils";
 import {
 	Sidebar,
 	SidebarContent,
@@ -18,13 +19,13 @@ import { NavGroup } from "@/components/nav-group";
 import { footerNavLinks, navGroups } from "@/components/app-shared";
 import { UsageMeter } from "@/components/usage-meter";
 import { useAuthStore } from "@/stores/auth-store";
-import { BookOpen, SunIcon, MoonIcon } from "lucide-react";
+import { BookOpen, SunIcon, MoonIcon, LogOut } from "lucide-react";
 import { openOnboarding } from "@/components/onboarding-dialog";
-import { NavUser } from "@/components/nav-user";
 import { AuthDialog } from "@/components/auth-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useThemeTransition } from "@/components/ui/shadcn-io/theme-toggle-button";
+import { useLogoutMutation } from "@/lib/authHooks";
 
 export function AppSidebar() {
 	const authStatus = useAuthStore((s) => s.status);
@@ -33,13 +34,9 @@ export function AppSidebar() {
 	);
 	const { theme, setTheme } = useTheme();
 	const { startTransition } = useThemeTransition();
+	const { mutate: logout, isPending: isLoggingOut } = useLogoutMutation();
 	const [mounted, setMounted] = useState(false);
 	useEffect(() => setMounted(true), []);
-	const handleThemeToggle = useCallback(() => {
-		const newTheme = theme === "dark" ? "light" : "dark";
-		startTransition(() => setTheme(newTheme));
-	}, [theme, setTheme, startTransition]);
-
 	return (
 		<Sidebar collapsible="icon" variant="floating" className="[&_[data-sidebar=sidebar]]:rounded-2xl [&_[data-sidebar=sidebar]]:border-border/40 [&_[data-sidebar=sidebar]]:relative [&_[data-sidebar=sidebar]]:bg-card">
 			<SidebarHeader className="border-b border-border/40">
@@ -56,16 +53,13 @@ export function AppSidebar() {
 					</a>
 				</div>
 
-				{/* Mobile-only: auth + theme toggle */}
+				{/* Mobile-only: auth + settings */}
 				<div className="sm:hidden px-2 pb-3 flex flex-col gap-2">
+					{/* Sign in / Get Started for guests */}
 					{authStatus === "unknown" ? (
 						<Skeleton className="h-9 w-full rounded-lg" />
-					) : authStatus === "authenticated" ? (
-						<div className="overflow-visible group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-							<NavUser />
-						</div>
-					) : (
-						<div className="flex flex-col gap-1.5 group-data-[collapsible=icon]:hidden">
+					) : authStatus !== "authenticated" ? (
+						<div className="flex flex-col gap-1.5">
 							<AuthDialog defaultTab="login">
 								<Button variant="outline" size="sm" className="w-full cursor-pointer">
 									Sign in
@@ -77,16 +71,57 @@ export function AppSidebar() {
 								</Button>
 							</AuthDialog>
 						</div>
-					)}
+					) : null}
+
+					{/* Settings section */}
 					{mounted && (
-						<SidebarMenu>
-							<SidebarMenuItem>
-								<SidebarMenuButton onClick={handleThemeToggle}>
-									{theme === "dark" ? <SunIcon /> : <MoonIcon />}
-									<span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
-						</SidebarMenu>
+						<div className="flex flex-col gap-1.5">
+							<span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 px-1 pt-1">
+								Settings
+							</span>
+
+							{/* Light / Dark segmented switcher */}
+							<div className="flex rounded-lg border border-border/50 bg-muted/30 p-0.5">
+								<button
+									onClick={() => startTransition(() => setTheme("light"))}
+									className={cn(
+										"flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors",
+										theme === "light"
+											? "bg-background text-foreground shadow-sm"
+											: "text-muted-foreground hover:text-foreground"
+									)}
+								>
+									<SunIcon size={13} />
+									Light
+								</button>
+								<button
+									onClick={() => startTransition(() => setTheme("dark"))}
+									className={cn(
+										"flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors",
+										theme === "dark"
+											? "bg-background text-foreground shadow-sm"
+											: "text-muted-foreground hover:text-foreground"
+									)}
+								>
+									<MoonIcon size={13} />
+									Dark
+								</button>
+							</div>
+
+							{/* Sign Out — only for authenticated users */}
+							{authStatus === "authenticated" && (
+								<Button
+									variant="outline"
+									size="sm"
+									className="w-full cursor-pointer text-muted-foreground hover:text-red-600 hover:border-red-300 dark:hover:border-red-800"
+									onClick={() => logout()}
+									disabled={isLoggingOut}
+								>
+									<LogOut size={14} />
+									{isLoggingOut ? "Signing out…" : "Sign out"}
+								</Button>
+							)}
+						</div>
 					)}
 				</div>
 			</SidebarHeader>

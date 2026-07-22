@@ -552,8 +552,8 @@ export default function AudioCard({
 
       {/* ── MOBILE COMPACT CONTROLS (< md) ── */}
       <div className="md:hidden flex flex-col gap-2">
-        {/* Row 1: Transport controls — centered and prominent */}
-        <div className="flex items-center justify-center gap-1 relative">
+        {/* Row 1: Transport + Translation */}
+        <div className="flex items-center justify-center gap-3 relative">
           {isThrottled && <SpamGuardOverlay cooldownLeft={cooldownLeft} />}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => guardedAction(prevVideo)} disabled={currentVideoIndex === 0}>
             <SkipBack size={15} />
@@ -578,9 +578,27 @@ export default function AudioCard({
               <SkipForward size={15} />
             )}
           </Button>
+          <Popover open={mobileTranslationOpen} onOpenChange={setMobileTranslationOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn("relative overflow-hidden h-8 w-8 p-0 cursor-pointer rounded-full", translationLang ? "bg-muted text-foreground" : "")}
+              >
+                <div className="usage-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-black/8 to-transparent dark:via-white/10" />
+                {translationLang
+                  ? <FlagImg url={TRANSLATION_LANGUAGES.find(l => l.code === translationLang)?.flagUrl ?? ""} alt={translationLang} />
+                  : <Globe size={14} />
+                }
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[260px] p-4 rounded-2xl" side="top" align="center">
+              <TranslationPicker current={translationLang} onSelect={setTranslationLang} />
+            </PopoverContent>
+          </Popover>
         </div>
 
-        {/* Row 2: Secondary controls — spread across full width */}
+        {/* Row 2: Secondary controls */}
         <div className="flex items-center justify-around">
           <Popover>
             <PopoverTrigger asChild>
@@ -610,24 +628,6 @@ export default function AudioCard({
             </PopoverTrigger>
             <PopoverContent className="w-32 p-1 rounded-xl" side="top" align="center">
               <SpeedPicker currentRate={rate} onSelect={(r) => { setRate(r); setPlaybackRate(r) }} />
-            </PopoverContent>
-          </Popover>
-          <Popover open={mobileTranslationOpen} onOpenChange={setMobileTranslationOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn("relative overflow-hidden h-7 px-1.5 gap-1 cursor-pointer", translationLang ? "bg-muted text-foreground" : "")}
-              >
-                <div className="usage-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-black/8 to-transparent dark:via-white/10" />
-                {translationLang
-                  ? <FlagImg url={TRANSLATION_LANGUAGES.find(l => l.code === translationLang)?.flagUrl ?? ""} alt={translationLang} />
-                  : <Globe size={14} />
-                }
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[260px] p-4 rounded-2xl" side="top" align="center">
-              <TranslationPicker current={translationLang} onSelect={setTranslationLang} />
             </PopoverContent>
           </Popover>
         </div>
