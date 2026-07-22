@@ -218,6 +218,8 @@ export default function RoutedSearchPage() {
                   <Bot className="h-3 w-3" />
                   AI Assistant
                 </button>
+                {/* Portal anchor — AiCompletion portals the History button here on mobile; hidden on Player tab */}
+                <div id="ai-history-portal" className={`ml-auto${mobileTab !== "ai" ? " hidden" : ""}`} />
               </div>
             )}
 

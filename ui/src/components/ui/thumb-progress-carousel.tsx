@@ -113,7 +113,7 @@ export function ThumbProgressCarousel({
             >
               {item.title}
             </span>
-            <div className='h-0.5 flex-1 sm:w-full bg-white/20 rounded-full overflow-hidden'>
+            <div className='h-0.5 flex-1 sm:flex-none sm:w-full bg-white/20 rounded-full overflow-hidden'>
               {idx === current ? (
                 <div
                   className='h-full bg-orange-400 rounded-full transition-none'

@@ -108,7 +108,7 @@ export function SessionSelector({
                     <span className="text-xs font-medium">History</span>
                     {/* Show active session name instead of raw count */}
                     {activeDisplayName && !isHistoryLoading && (
-                        <span className="text-[10px] bg-primary/10 text-primary rounded-full px-1.5 py-px font-medium max-w-[80px] truncate">
+                        <span className="text-[10px] bg-orange-500 text-white rounded-full px-1.5 py-px font-medium max-w-[80px] truncate">
                             {activeDisplayName}
                         </span>
                     )}

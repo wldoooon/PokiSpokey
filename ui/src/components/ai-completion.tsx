@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSearchStore } from "@/stores/use-search-store";
 import { useUsageStore } from "@/stores/usage-store";
 import { Button } from "@/components/ui/button";
@@ -259,6 +260,12 @@ export function AiCompletion({
 
     branchesRef.current = branches;
 
+    // Portal anchor in the mobile tab bar — renders History button next to Player/AI tabs
+    const [historyPortalEl, setHistoryPortalEl] = useState<Element | null>(null);
+    useLayoutEffect(() => {
+        setHistoryPortalEl(document.getElementById("ai-history-portal"));
+    }, []);
+
     // Copy Logic
     const copyButtonRef = useRef<HTMLButtonElement>(null);
     const { isCopied, copyToClipboard } = useCopyToClipboard({
@@ -490,8 +497,9 @@ export function AiCompletion({
         <div className="relative w-full h-full flex flex-col bg-card overflow-hidden">
             <div className="pointer-events-none absolute inset-0 dark:bg-[radial-gradient(20%_30%_at_85%_0%,--theme(--color-foreground/.1),transparent)]" />
 
-            <header className="relative w-full flex-shrink-0 px-4 pt-4 sm:px-6 sm:pt-5">
-                <div className="absolute right-0 top-0 z-20">
+            {/* Portal History button into mobile tab bar; show inline only on desktop */}
+            {historyPortalEl
+                ? createPortal(
                     <SessionSelector
                         sessions={sessions}
                         activeSessionId={activeSessionId}
@@ -501,10 +509,29 @@ export function AiCompletion({
                         currentQuery={query}
                         isLoading={isLoading}
                         isHistoryLoading={isHistoryLoading}
-                    />
-                </div>
+                        className="px-1.5 py-1 text-[10px] gap-1"
+                    />,
+                    historyPortalEl
+                )
+                : null
+            }
 
-             
+            <header className="relative w-full flex-shrink-0 px-4 pt-3 sm:px-6 sm:pt-5">
+                {/* Desktop-only: History button above title (mobile uses portal to tab bar) */}
+                {!historyPortalEl && (
+                    <div className="flex justify-end mb-1">
+                        <SessionSelector
+                            sessions={sessions}
+                            activeSessionId={activeSessionId}
+                            onSelectSession={handleSessionSelect}
+                            onDeleteSession={deleteSession}
+                            onClearAll={clearHistory}
+                            currentQuery={query}
+                            isLoading={isLoading}
+                            isHistoryLoading={isHistoryLoading}
+                        />
+                    </div>
+                )}
 
                 <h1 className="text-base sm:text-lg font-semibold text-foreground text-center leading-snug">
                     {query ? (
