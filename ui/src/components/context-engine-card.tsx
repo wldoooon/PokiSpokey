@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect } from "react"
+import React, { useEffect, useRef, useState } from "react"
 
 declare global {
   namespace JSX {
@@ -18,6 +18,9 @@ declare global {
 }
 
 export function ContextEngineCard() {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [inView, setInView] = useState(false)
+
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     import("@lordicon/element").then((mod: any) => {
@@ -25,15 +28,27 @@ export function ContextEngineCard() {
     })
   }, [])
 
+  // Pause lord-icon loop when scrolled out of viewport
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { threshold: 0 }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
   return (
-    <div className="relative p-8 min-h-80 flex flex-col border-b lg:border-b-0 lg:border-r border-border/40">
+    <div ref={cardRef} className="relative p-8 min-h-80 flex flex-col border-b lg:border-b-0 lg:border-r border-border/40">
 
       {/* Top metadata row */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <lord-icon
             src="/global.json"
-            trigger="loop"
+            trigger={inView ? "loop" : "hover"}
             colors="primary:#ea580c,secondary:#ea580c"
             style={{ width: 32, height: 32 }}
           />

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -9,9 +9,8 @@ import { AuthDialog } from "@/components/auth-dialog"
 import { startTour } from "@/components/app-tour"
 
 const WELCOME_KEY = "vl_welcome_done"
-const DEMO_VIDEO_SRC = "/How2.mp4"
-const STEPS = ["welcome", "how", "tour", "start"] as const
-const SI_LABELS = ["Welcome", "In Action", "Guided Tour", "Ready"]
+const STEPS = ["welcome", "tour", "start"] as const
+const SI_LABELS = ["Welcome", "Guided Tour", "Ready"]
 
 // All keyframes live here — injected once via <style> in OnboardingDialog.
 // Every animation uses only transform + opacity → runs on the GPU compositor
@@ -42,14 +41,6 @@ const KEYFRAMES = `
   from { transform: translateY(10px); opacity: 0; }
   to   { transform: translateY(0); opacity: 1; }
 }
-@keyframes h-title-in {
-  from { transform: translateY(12px); opacity: 0; }
-  to   { transform: translateY(0); opacity: 1; }
-}
-@keyframes h-video-in {
-  from { transform: scale(0.88); opacity: 0; }
-  to   { transform: scale(1); opacity: 1; }
-}
 `
 
 // CSS cubic-bezier equivalents of GSAP named eases
@@ -78,7 +69,7 @@ function StepIndicator({ step, open }: { step: number; open: boolean }) {
   // Which circle index should pulse right now (-1 = none)
   const [pulseIdx, setPulseIdx] = useState(-1)
   // scaleX value for each of the 3 fill bars (0 = empty, 1 = full)
-  const [fillScales, setFillScales] = useState([0, 0, 0])
+  const [fillScales, setFillScales] = useState([0, 0])
   const prevStep = useRef(0)
 
   // Start / reset animations when dialog opens or closes
@@ -87,7 +78,7 @@ function StepIndicator({ step, open }: { step: number; open: boolean }) {
       setAnimStarted(false)
       setPoppedSet(new Set())
       setPulseIdx(-1)
-      setFillScales([0, 0, 0])
+      setFillScales([0, 0])
       prevStep.current = 0
       return
     }
@@ -245,66 +236,6 @@ function StepWelcome() {
 }
 
 // ---------------------------------------------------------------------------
-// StepHow
-// ---------------------------------------------------------------------------
-
-const HOW_TITLE = "See it in action"
-
-function StepHow({ active }: { active: boolean }) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [videoReady, setVideoReady] = useState(false)
-
-  useEffect(() => {
-    if (!videoRef.current) return
-    if (active) {
-      videoRef.current.play().catch(() => {})
-    } else {
-      videoRef.current.pause()
-    }
-  }, [active])
-
-  const handleCanPlay = useCallback(() => setVideoReady(true), [])
-
-  return (
-    <div className="flex flex-col gap-2 py-2 sm:py-3">
-      <h2
-        className="text-lg font-extrabold tracking-tight text-foreground shrink-0"
-        style={{ animation: a("h-title-in", 0.3, E.power3Out, 0.25) }}
-      >
-        {HOW_TITLE}
-      </h2>
-      <div
-        className="overflow-hidden rounded-xl border border-border/50 relative"
-        style={{
-          height: "clamp(180px, 32vh, 420px)",
-          animation: a("h-video-in", 0.5, E.backOut14, 0.4),
-        }}
-      >
-        {/* Loading skeleton — shown until the browser has buffered enough to play */}
-        {!videoReady && (
-          <div className="absolute inset-0 bg-muted animate-pulse rounded-xl" />
-        )}
-        <video
-          ref={videoRef}
-          src={DEMO_VIDEO_SRC}
-          preload="auto"
-          playsInline
-          onCanPlay={handleCanPlay}
-          onEnded={() => {
-            if (videoRef.current) videoRef.current.play().catch(() => {})
-          }}
-          style={{
-            width: "100%", height: "100%", objectFit: "cover", display: "block",
-            opacity: videoReady ? 1 : 0,
-            transition: "opacity 0.25s ease",
-          }}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // StepTour
 // ---------------------------------------------------------------------------
 
@@ -410,18 +341,6 @@ export function OnboardingDialog() {
     return () => { _openOnboarding = null }
   }, [])
 
-  // Preload the demo video as soon as the dialog opens so it's ready by step 2
-  useEffect(() => {
-    if (!open) return
-    const link = document.createElement("link")
-    link.rel = "preload"
-    link.as = "video"
-    link.type = "video/mp4"
-    link.href = DEMO_VIDEO_SRC
-    document.head.appendChild(link)
-    return () => { document.head.removeChild(link) }
-  }, [open])
-
   useEffect(() => {
     if (!localStorage.getItem(WELCOME_KEY)) setOpen(true)
   }, [])
@@ -476,9 +395,8 @@ export function OnboardingDialog() {
                 className="w-full px-4 sm:px-8 pb-3 flex flex-col"
               >
                 {step === 0 && <StepWelcome />}
-                {step === 1 && <StepHow active={open && step === 1} />}
-                {step === 2 && <StepTour />}
-                {step === 3 && <StepStart onGuest={() => close(true)} onSignUp={handleSignUp} />}
+                {step === 1 && <StepTour />}
+                {step === 2 && <StepStart onGuest={() => close(true)} onSignUp={handleSignUp} />}
               </motion.div>
             </AnimatePresence>
           </div>

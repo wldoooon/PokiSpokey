@@ -31,47 +31,48 @@ export function ThumbProgressCarousel({
 }: ThumbProgressCarouselProps) {
   const [api, setApi] = React.useState<CarouselApi>();
   const [current, setCurrent] = React.useState(0);
-  const [progress, setProgress] = React.useState(0);
   const [isPaused, setIsPaused] = React.useState(false);
+  // Drives CSS transition: false = width:0 (reset), true = width:100% (fill)
+  const [filling, setFilling] = React.useState(false);
 
   React.useEffect(() => {
     if (!api) return;
     const onSelect = () => {
       setCurrent(api.selectedScrollSnap());
-      setProgress(0);
+      // Reset the bar instantly, then start filling on next frame
+      setFilling(false);
     };
     api.on('select', onSelect);
     return () => { api.off('select', onSelect); };
   }, [api]);
 
+  // When filling resets to false, kick it back to true on the next frame
+  // so the CSS transition animates from 0% → 100%
   React.useEffect(() => {
-    if (!api || isPaused) return;
-    const tickRate = 50;
-    const step = 100 / (interval / tickRate);
-    const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) return 100;
-        return prev + step;
-      });
-    }, tickRate);
-    return () => clearInterval(timer);
-  }, [api, isPaused, interval]);
+    if (filling || !api) return;
+    const raf = requestAnimationFrame(() => setFilling(true));
+    return () => cancelAnimationFrame(raf);
+  }, [filling, api]);
 
-  React.useEffect(() => {
-    if (api && progress >= 100) {
-      if (api.canScrollNext()) {
-        api.scrollNext();
-      } else {
-        api.scrollTo(0);
-      }
+  // When the CSS transition ends (bar reaches 100%), advance the slide
+  const handleTransitionEnd = React.useCallback(() => {
+    if (!api || isPaused) return;
+    if (api.canScrollNext()) {
+      api.scrollNext();
+    } else {
+      api.scrollTo(0);
     }
-  }, [api, progress]);
+  }, [api, isPaused]);
 
   return (
     <div
       className='relative w-full h-full group overflow-hidden bg-black'
       onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
+      onMouseLeave={() => {
+        setIsPaused(false);
+        // Restart the fill when unpausing
+        setFilling(false);
+      }}
     >
       <Carousel setApi={setApi} className='w-full h-full' opts={{ loop: true }}>
         <CarouselContent className='h-full m-0'>
@@ -116,8 +117,14 @@ export function ThumbProgressCarousel({
             <div className='h-0.5 flex-1 sm:flex-none sm:w-full bg-white/20 rounded-full overflow-hidden'>
               {idx === current ? (
                 <div
-                  className='h-full bg-orange-400 rounded-full transition-none'
-                  style={{ width: `${progress}%` }}
+                  className='h-full bg-orange-400 rounded-full'
+                  style={{
+                    width: filling && !isPaused ? '100%' : '0%',
+                    transition: filling && !isPaused
+                      ? `width ${interval}ms linear`
+                      : 'none',
+                  }}
+                  onTransitionEnd={handleTransitionEnd}
                 />
               ) : (
                 <div

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react"
 // Char sets per angular sector — different "arms" of the bloom get different chars
 const SECTOR_CHARS = ["·", ".", ",", ";", ":", "'", "-", "~", "`", "\"", "_", "+"]
 const CELL = 16
-const FPS = 30
+const FPS = 15
 
 interface AsciiBackgroundProps {
   isDark?: boolean
