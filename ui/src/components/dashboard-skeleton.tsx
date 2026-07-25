@@ -194,7 +194,7 @@ export function DashboardSkeleton() {
 												].map((lang, idx) => (
 													<div key={`${copy}-${idx}`} className="w-[120px] sm:w-[192px] h-full border-r border-border/40 shrink-0 relative flex items-center justify-center">
 														{/* Floating Language Tags */}
-														<div className="z-10 bg-background/90 text-foreground text-[10px] sm:text-xs font-mono px-2 py-2 sm:px-4 sm:py-3 rounded-none shadow-sm opacity-95 backdrop-blur-md flex items-center gap-2 sm:gap-4 transition-all">
+														<div className="z-10 bg-background/90 text-foreground text-[10px] sm:text-xs font-mono px-2 py-2 sm:px-4 sm:py-3 rounded-none shadow-sm opacity-95 backdrop-blur-md flex items-center gap-2 sm:gap-4 transition-all" style={{ willChange: "transform", contain: "layout style paint" }}>
 															<img src={lang.icon} alt={lang.name} className="w-7 sm:w-12 h-auto max-h-6 sm:max-h-8 object-contain" />
 															<span className="font-bold tracking-widest text-foreground/80 text-[9px] sm:text-[11px]">
 																{lang.name}
