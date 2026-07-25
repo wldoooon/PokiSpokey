@@ -2,12 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import { useTheme } from "next-themes"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Compass, User } from "lucide-react"
-import gsap from "gsap"
-import { useGSAP } from "@gsap/react"
+import { User } from "lucide-react"
 import { AuthDialog } from "@/components/auth-dialog"
 import { startTour } from "@/components/app-tour"
 
@@ -16,40 +13,90 @@ const DEMO_VIDEO_SRC = "/How2.mp4"
 const STEPS = ["welcome", "how", "tour", "start"] as const
 const SI_LABELS = ["Welcome", "In Action", "Guided Tour", "Ready"]
 
+// All keyframes live here — injected once via <style> in OnboardingDialog.
+// Every animation uses only transform + opacity → runs on the GPU compositor
+// thread, never blocked by JS/React/GC, even on 1GB RAM phones.
+const KEYFRAMES = `
+@keyframes si-track-draw {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes si-circle-pop {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+@keyframes si-heartbeat {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+@keyframes w-logo-in {
+  from { transform: translateY(-16px) scale(0.8); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes w-word-in {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes w-desc-in {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes h-title-in {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes h-video-in {
+  from { transform: scale(0.88); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+`
+
+// CSS cubic-bezier equivalents of GSAP named eases
+const E = {
+  backOut2:  "cubic-bezier(0.34,1.56,0.64,1)",
+  backOut25: "cubic-bezier(0.34,1.65,0.64,1)",
+  backOut14: "cubic-bezier(0.34,1.3,0.64,1)",
+  power3Out: "cubic-bezier(0.22,1,0.36,1)",
+  power2Out: "cubic-bezier(0.33,1,0.68,1)",
+}
+
+// Builds a CSS `animation` shorthand string.
+// `both` = backwards (apply `from` during delay) + forwards (hold `to` after end).
+function a(name: string, dur: number, ease: string, delay = 0): string {
+  return `${name} ${dur}s ${ease} ${delay}s both`
+}
+
+// ---------------------------------------------------------------------------
+// StepIndicator
+// ---------------------------------------------------------------------------
+
 function StepIndicator({ step, open }: { step: number; open: boolean }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const hasDrawn = useRef(false)
+  const [animStarted, setAnimStarted] = useState(false)
+  // Tracks which circles have finished their pop — prevents replay on heartbeat reset
+  const [poppedSet, setPoppedSet] = useState<Set<number>>(new Set())
+  // Which circle index should pulse right now (-1 = none)
+  const [pulseIdx, setPulseIdx] = useState(-1)
+  // scaleX value for each of the 3 fill bars (0 = empty, 1 = full)
+  const [fillScales, setFillScales] = useState([0, 0, 0])
   const prevStep = useRef(0)
 
-  // Initial draw when dialog opens
+  // Start / reset animations when dialog opens or closes
   useEffect(() => {
-    if (!open) { hasDrawn.current = false; prevStep.current = 0; return }
-    if (hasDrawn.current || !ref.current) return
-    hasDrawn.current = true
-    prevStep.current = 0
-
-    const circles = ref.current.querySelectorAll<HTMLElement>(".si-circle")
-    const tracks = ref.current.querySelectorAll<HTMLElement>(".si-track")
-
-    const tl = gsap.timeline()
-    // Circles start invisible
-    gsap.set(circles, { scale: 0 })
-    // Tracks draw left → right
-    tl.fromTo(tracks,
-      { scaleX: 0 },
-      { scaleX: 1, duration: 0.38, ease: "power2.out", stagger: 0.14, transformOrigin: "left center" }
-    )
-    // Circles pop in after their line arrives
-    tl.fromTo(circles,
-      { scale: 0 },
-      { scale: 1, duration: 0.28, ease: "back.out(2.5)", stagger: 0.1 },
-      "-=0.25"
-    )
+    if (!open) {
+      setAnimStarted(false)
+      setPoppedSet(new Set())
+      setPulseIdx(-1)
+      setFillScales([0, 0, 0])
+      prevStep.current = 0
+      return
+    }
+    setAnimStarted(true)
   }, [open])
 
-  // Step change animation
+  // Animate fill bar + heartbeat on step change
   useEffect(() => {
-    if (!ref.current || !hasDrawn.current) return
+    if (!animStarted) return
     const prev = prevStep.current
     if (prev === step) return
     prevStep.current = step
@@ -57,56 +104,76 @@ function StepIndicator({ step, open }: { step: number; open: boolean }) {
     const isForward = step > prev
     const lineIdx = isForward ? prev : step
 
-    const fill = ref.current.querySelector<HTMLElement>(`.si-fill-${lineIdx}`)
-    const dot  = ref.current.querySelector<HTMLElement>(`.si-dot-${lineIdx}`)
-    const circle = ref.current.querySelector<HTMLElement>(`.si-circle-${step}`)
+    setFillScales(cur => {
+      const next = [...cur]
+      next[lineIdx] = isForward ? 1 : 0
+      return next
+    })
 
-    const tl = gsap.timeline()
+    setPulseIdx(step)
+  }, [step, animStarted])
 
-    if (isForward && fill && dot) {
-      // Dot races across the line, then fill snaps full
-      tl.set(dot, { opacity: 1, left: "0%" })
-      tl.to(dot, { left: "100%", duration: 0.38, ease: "power3.in" })
-      tl.set(dot, { opacity: 0 })
-      tl.set(fill, { width: "100%" }, "<")
-    } else if (!isForward && fill) {
-      // Drain right → left
-      tl.to(fill, { width: "0%", duration: 0.3, ease: "power2.in" })
+  const handleCircleAnimEnd = (e: React.AnimationEvent<HTMLDivElement>, i: number) => {
+    if (e.animationName === "si-circle-pop") {
+      setPoppedSet(prev => new Set([...prev, i]))
+    } else if (e.animationName === "si-heartbeat") {
+      setPulseIdx(-1)
     }
+  }
 
-    // Heartbeat on the newly active circle
-    if (circle) {
-      tl.fromTo(circle,
-        { scale: 1 },
-        { scale: 1.22, duration: 0.13, ease: "power2.out", yoyo: true, repeat: 1 },
-        isForward ? "-=0.12" : "+=0"
-      )
-    }
-  }, [step])
+  const getCircleAnimation = (i: number): string | undefined => {
+    if (pulseIdx === i) return a("si-heartbeat", 0.26, "ease-out")
+    if (animStarted && !poppedSet.has(i)) return a("si-circle-pop", 0.28, E.backOut25, 0.41 + i * 0.1)
+    return undefined
+  }
 
   return (
-    <div ref={ref} className="px-4 sm:px-8 pt-4 sm:pt-5 pb-4 sm:pb-5 border-b border-border/30">
+    <div className="px-4 sm:px-8 pt-4 sm:pt-5 pb-4 sm:pb-5 border-b border-border/30">
       {/* Row 1: circles + animated lines */}
       <div className="flex items-center">
         {SI_LABELS.map((_, i) => (
           <React.Fragment key={i}>
-            <div className={`si-circle si-circle-${i} h-6 w-6 rounded-full border flex items-center justify-center text-[11px] font-medium shrink-0 ${
-              i <= step ? "border-primary text-primary" : "border-border text-muted-foreground/40"
-            }`}>
+            <div
+              className={`h-6 w-6 rounded-full border flex items-center justify-center text-[11px] font-medium shrink-0 ${
+                i <= step ? "border-primary text-primary" : "border-border text-muted-foreground/40"
+              }`}
+              style={{
+                animation: getCircleAnimation(i),
+                // Hold at scale(0) until the CSS animation takes over (prevents one-frame flash)
+                transform: !animStarted && !poppedSet.has(i) ? "scale(0)" : undefined,
+              }}
+              onAnimationEnd={e => handleCircleAnimEnd(e, i)}
+            >
               {i + 1}
             </div>
             {i < SI_LABELS.length - 1 && (
               <div className="flex-1 relative h-3 flex items-center mx-2">
-                <div className="si-track absolute inset-x-0 h-px bg-border/40 rounded-full" />
-                <div className={`si-fill-${i} absolute h-px bg-primary rounded-full left-0`} style={{ width: "0%" }} />
-                <div className={`si-dot-${i} absolute h-2 w-2 rounded-full bg-primary`} style={{ top: "50%", marginTop: -4, opacity: 0, left: "0%" }} />
+                {/* Gray track — draws in left → right on open */}
+                <div
+                  className="absolute inset-x-0 h-px bg-border/40 rounded-full"
+                  style={{
+                    transformOrigin: "left center",
+                    // Hold at scaleX(0) before animation starts to avoid flash
+                    transform: !animStarted ? "scaleX(0)" : undefined,
+                    animation: animStarted ? a("si-track-draw", 0.38, E.power2Out, i * 0.14) : undefined,
+                  }}
+                />
+                {/* Primary fill bar — CSS transition driven by fillScales state */}
+                <div
+                  className="absolute h-px bg-primary rounded-full left-0 right-0"
+                  style={{
+                    transform: `scaleX(${fillScales[i]})`,
+                    transformOrigin: "left center",
+                    transition: "transform 0.35s cubic-bezier(0.33,1,0.68,1)",
+                  }}
+                />
               </div>
             )}
           </React.Fragment>
         ))}
       </div>
-      {/* Row 2: labels */}
-      <div className="flex items-start mt-2.5">
+      {/* Row 2: labels — hidden on very small screens where they'd overlap */}
+      <div className="hidden min-[420px]:flex items-start mt-2.5">
         {SI_LABELS.map((label, i) => (
           <React.Fragment key={i}>
             <div className="shrink-0 w-6 relative h-3.5">
@@ -124,62 +191,66 @@ function StepIndicator({ step, open }: { step: number; open: boolean }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// StepWelcome
+// ---------------------------------------------------------------------------
+
 const HEADLINE_WORDS = ["Finally", "hear", "words", "the", "way", "real", "people", "say", "them"]
 
-function StepWelcome({ theme: _ }: { theme?: string }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useGSAP(() => {
-    const tl = gsap.timeline({ delay: 0.25 })
-
-    tl.fromTo(".w-logo",
-      { y: -16, opacity: 0, scale: 0.8 },
-      { y: 0, opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }
-    )
-    .fromTo(".w-word",
-      { y: 20, opacity: 0 },
-      { y: 0, opacity: 1, duration: 0.38, ease: "power3.out", stagger: 0.045 },
-      "-=0.1"
-    )
-    .fromTo(".w-desc",
-      { y: 10, opacity: 0 },
-      { y: 0, opacity: 1, duration: 0.4, ease: "power2.out", stagger: 0.09 },
-      "-=0.15"
-    )
-  }, { scope: containerRef })
-
+function StepWelcome() {
   return (
-    <div ref={containerRef} className="flex flex-col justify-center h-full gap-3 sm:gap-5">
+    <div className="flex flex-col gap-3 sm:gap-5 py-2 sm:py-4">
       {/* Logo + Headline inline */}
       <div className="flex items-center gap-3 sm:gap-4">
-        <img src="/main_logo.png" alt="PokiSpokey" className="w-logo w-16 h-16 sm:w-24 sm:h-24 object-contain shrink-0" />
-        <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground leading-tight flex flex-wrap gap-x-[0.27em]">
+        <img
+          src="/main_logo.png"
+          alt="PokiSpokey"
+          className="w-12 h-12 sm:w-20 sm:h-20 object-contain shrink-0"
+          style={{ animation: a("w-logo-in", 0.5, E.backOut2, 0.25) }}
+        />
+        <h2 className="text-xl sm:text-4xl font-extrabold tracking-tight text-foreground leading-tight flex flex-wrap gap-x-[0.27em]">
           {HEADLINE_WORDS.map((word, i) => (
-            <span key={i} className="w-word inline-block">{word}</span>
+            <span
+              key={i}
+              className="inline-block"
+              style={{ animation: a("w-word-in", 0.38, E.power3Out, 0.65 + i * 0.045) }}
+            >
+              {word}
+            </span>
           ))}
         </h2>
       </div>
 
-      {/* Welcome title */}
-      <p className="w-desc text-base sm:text-xl font-bold text-foreground">
+      <p
+        className="text-sm sm:text-xl font-bold text-foreground"
+        style={{ animation: a("w-desc-in", 0.4, E.power2Out, 1.24) }}
+      >
         Welcome To <span className="text-primary">PokiSpokey</span>
       </p>
 
-      {/* Description */}
-      <p className="w-desc text-sm sm:text-base text-muted-foreground leading-relaxed">
-        Just type any word and we'll find you the exact moment it's used in a real movie, podcast, or TV show so you can hear how people actually say it, not how a textbook tells you to.
+      <p
+        className="text-sm sm:text-base text-muted-foreground leading-relaxed"
+        style={{ animation: a("w-desc-in", 0.4, E.power2Out, 1.33) }}
+      >
+        Just type any word and we&apos;ll find you the exact moment it&apos;s used in a real movie, podcast, or TV show so you can hear how people actually say it, not how a textbook tells you to.
       </p>
-      <p className="w-desc text-sm sm:text-base text-muted-foreground leading-relaxed hidden sm:block">
+      <p
+        className="text-sm sm:text-base text-muted-foreground leading-relaxed hidden sm:block"
+        style={{ animation: a("w-desc-in", 0.4, E.power2Out, 1.42) }}
+      >
         No boring exercises. No robot voices. Just real clips, real people, real language.
       </p>
     </div>
   )
 }
 
+// ---------------------------------------------------------------------------
+// StepHow
+// ---------------------------------------------------------------------------
+
 const HOW_TITLE = "See it in action"
 
-function StepHow({ active, onRegisterExit }: { active: boolean; onRegisterExit: (fn: () => Promise<void>) => void }) {
-  const containerRef = useRef<HTMLDivElement>(null)
+function StepHow({ active }: { active: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [videoReady, setVideoReady] = useState(false)
 
@@ -194,36 +265,21 @@ function StepHow({ active, onRegisterExit }: { active: boolean; onRegisterExit: 
 
   const handleCanPlay = useCallback(() => setVideoReady(true), [])
 
-  useGSAP(() => {
-    const tl = gsap.timeline({ delay: 0.25 })
-
-    tl.fromTo(".h-char",
-      { y: 12, opacity: 0 },
-      { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }
-    )
-    .fromTo(".h-video",
-      { scale: 0.88, opacity: 0 },
-      { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.4)" },
-      "-=0.15"
-    )
-
-    onRegisterExit(() => new Promise<void>(resolve => {
-      gsap.to(".h-video", {
-        scale: 0.88,
-        opacity: 0,
-        duration: 0.22,
-        ease: "power2.in",
-        onComplete: resolve,
-      })
-    }))
-  }, { scope: containerRef })
-
   return (
-    <div ref={containerRef} className="flex flex-col h-full gap-2">
-      <h2 className="h-char text-lg font-extrabold tracking-tight text-foreground shrink-0">
+    <div className="flex flex-col gap-2 py-2 sm:py-3">
+      <h2
+        className="text-lg font-extrabold tracking-tight text-foreground shrink-0"
+        style={{ animation: a("h-title-in", 0.3, E.power3Out, 0.25) }}
+      >
         {HOW_TITLE}
       </h2>
-      <div className="h-video overflow-hidden rounded-xl border border-border/50 flex-1 min-h-0 relative">
+      <div
+        className="overflow-hidden rounded-xl border border-border/50 relative"
+        style={{
+          height: "clamp(180px, 32vh, 420px)",
+          animation: a("h-video-in", 0.5, E.backOut14, 0.4),
+        }}
+      >
         {/* Loading skeleton — shown until the browser has buffered enough to play */}
         {!videoReady && (
           <div className="absolute inset-0 bg-muted animate-pulse rounded-xl" />
@@ -248,11 +304,15 @@ function StepHow({ active, onRegisterExit }: { active: boolean; onRegisterExit: 
   )
 }
 
+// ---------------------------------------------------------------------------
+// StepTour
+// ---------------------------------------------------------------------------
+
 function StepTour() {
   return (
-    <div className="flex flex-col sm:grid sm:grid-cols-5 gap-4 sm:gap-8 h-full">
+    <div className="flex flex-col sm:grid sm:grid-cols-5 gap-4 sm:gap-8 py-2 sm:py-4">
       {/* Left: explanation */}
-      <div className="sm:col-span-3 flex flex-col justify-center gap-3 sm:gap-4">
+      <div className="sm:col-span-3 flex flex-col gap-3 sm:gap-4">
         <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground leading-tight">
           Not sure what something does?
         </h2>
@@ -265,7 +325,7 @@ function StepTour() {
       </div>
 
       {/* Right: single search bar skeleton with ? icon */}
-      <div className="sm:col-span-2 flex items-center justify-center">
+      <div className="flex sm:col-span-2 items-center justify-center">
         <div className="flex flex-col items-center gap-3 w-full">
           <div className="w-full rounded-xl border border-border/60 bg-card shadow-sm px-3 py-3 flex items-center gap-2">
             <div className="h-2 w-3 rounded bg-muted/40 shrink-0" />
@@ -281,17 +341,21 @@ function StepTour() {
   )
 }
 
+// ---------------------------------------------------------------------------
+// StepStart
+// ---------------------------------------------------------------------------
+
 function StepStart({ onGuest, onSignUp }: { onGuest: () => void; onSignUp: () => void }) {
   return (
-    <div className="flex flex-col justify-center h-full gap-6">
+    <div className="flex flex-col gap-4 sm:gap-6 py-2 sm:py-4">
       <div>
-        <h2 className="text-2xl font-extrabold tracking-tight text-foreground">How do you want to start?</h2>
+        <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">How do you want to start?</h2>
         <p className="text-sm text-muted-foreground mt-1">You can always create an account later.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {/* Guest card */}
-        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-5">
+        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 sm:p-5">
           <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center">
             <User className="h-4 w-4 text-muted-foreground" />
           </div>
@@ -307,7 +371,7 @@ function StepStart({ onGuest, onSignUp }: { onGuest: () => void; onSignUp: () =>
         </div>
 
         {/* Sign up card */}
-        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-5 relative overflow-hidden">
+        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 sm:p-5 relative overflow-hidden">
           <div className="usage-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-black/8 to-transparent dark:via-white/10" />
           <div className="absolute top-3 right-3 text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full z-10">Recommended</div>
           <div className="flex-1 relative z-10">
@@ -325,6 +389,10 @@ function StepStart({ onGuest, onSignUp }: { onGuest: () => void; onSignUp: () =>
   )
 }
 
+// ---------------------------------------------------------------------------
+// OnboardingDialog
+// ---------------------------------------------------------------------------
+
 let _openOnboarding: (() => void) | null = null
 export function openOnboarding() {
   localStorage.removeItem(WELCOME_KEY)
@@ -336,8 +404,6 @@ export function OnboardingDialog() {
   const [step, setStep] = useState(0)
   const [direction, setDirection] = useState(1)
   const [authOpen, setAuthOpen] = useState(false)
-  const { resolvedTheme } = useTheme()
-  const howExitRef = useRef<(() => Promise<void>) | undefined>(undefined)
 
   useEffect(() => {
     _openOnboarding = () => { setStep(0); setDirection(1); setOpen(true) }
@@ -360,9 +426,8 @@ export function OnboardingDialog() {
     if (!localStorage.getItem(WELCOME_KEY)) setOpen(true)
   }, [])
 
-  const goTo = async (next: number) => {
+  const goTo = (next: number) => {
     setDirection(next > step ? 1 : -1)
-    if (step === 1 && howExitRef.current) await howExitRef.current()
     setStep(next)
   }
 
@@ -384,59 +449,58 @@ export function OnboardingDialog() {
 
   return (
     <>
-    <AuthDialog open={authOpen} onOpenChange={setAuthOpen} defaultTab="signup" />
-    <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent
-        showCloseButton={false}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-        className="w-[95vw] sm:max-w-4xl p-0 overflow-hidden rounded-2xl gap-0 border-border/60 max-h-[92vh] overflow-y-auto"
-      >
+      <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
+      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} defaultTab="signup" />
+      <Dialog open={open} onOpenChange={() => {}}>
+        <DialogContent
+          showCloseButton={false}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          className="w-[95vw] sm:max-w-4xl p-0 overflow-hidden rounded-2xl gap-0 border-border/60 max-h-[92vh] overflow-y-auto"
+        >
+          <DialogTitle className="sr-only">Welcome to PokiSpokey</DialogTitle>
+          <StepIndicator step={step} open={open} />
 
-        <DialogTitle className="sr-only">Welcome to PokiSpokey</DialogTitle>
-        <StepIndicator step={step} open={open} />
+          {/* Slide area */}
+          <div className="overflow-hidden min-h-[240px]">
+            <AnimatePresence mode="wait" custom={direction}>
+              <motion.div
+                key={step}
+                custom={direction}
+                initial={step === 0 ? false : { x: direction * 340, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: direction * -340, opacity: 0 }}
+                transition={{ duration: 0.22, ease: "easeInOut" }}
+                className="w-full px-4 sm:px-8 pb-3 flex flex-col"
+              >
+                {step === 0 && <StepWelcome />}
+                {step === 1 && <StepHow active={open && step === 1} />}
+                {step === 2 && <StepTour />}
+                {step === 3 && <StepStart onGuest={() => close(true)} onSignUp={handleSignUp} />}
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
-        {/* Slide area */}
-        <div className="relative overflow-hidden" style={{ minHeight: step === 1 ? "min(560px, 45vh)" : "min(340px, 35vh)" }}>
-          <AnimatePresence mode="wait" custom={direction}>
-            <motion.div
-              key={step}
-              custom={direction}
-              initial={step === 0 ? false : { x: direction * 340, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: direction * -340, opacity: 0 }}
-              transition={{ duration: 0.22, ease: "easeInOut" }}
-              className="absolute inset-0 px-4 sm:px-8 pt-4 pb-3 flex flex-col"
-            >
-              {step === 0 && <StepWelcome theme={resolvedTheme} />}
-              {step === 1 && <StepHow active={open && step === 1} onRegisterExit={fn => { howExitRef.current = fn }} />}
-              {step === 2 && <StepTour />}
-              {step === 3 && <StepStart onGuest={() => close(true)} onSignUp={handleSignUp} />}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+          {/* Footer */}
+          <div className="px-4 sm:px-8 pb-5 sm:pb-6 pt-3 flex items-center justify-between border-t border-border/30">
+            {step > 0 ? (
+              <Button variant="ghost" size="sm" onClick={() => goTo(step - 1)} className="text-muted-foreground">
+                ← Back
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => close()} className="text-muted-foreground">
+                Skip
+              </Button>
+            )}
 
-        {/* Footer */}
-        <div className="px-4 sm:px-8 pb-5 sm:pb-6 pt-3 flex items-center justify-between border-t border-border/30">
-          {step > 0 ? (
-            <Button variant="ghost" size="sm" onClick={() => goTo(step - 1)} className="text-muted-foreground">
-              ← Back
-            </Button>
-          ) : (
-            <Button variant="ghost" size="sm" onClick={() => close()} className="text-muted-foreground">
-              Skip
-            </Button>
-          )}
-
-          {step < total - 1 && (
-            <Button size="sm" onClick={() => goTo(step + 1)}>
-              Next →
-            </Button>
-          )}
-        </div>
-
-      </DialogContent>
-    </Dialog>
+            {step < total - 1 && (
+              <Button size="sm" onClick={() => goTo(step + 1)}>
+                Next →
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
