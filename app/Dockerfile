@@ -25,7 +25,7 @@
 # - We use 3.11 specifically because our code is tested against it
 # - "alpine" exists (~50MB) but causes issues with C extensions like asyncpg
 #   because Alpine uses musl libc instead of glibc. Slim is the sweet spot.
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 # These ENV vars are best practice for ANY Python Docker image:
 # PYTHONDONTWRITEBYTECODE=1 → Don't create .pyc files (saves disk space in container)
@@ -47,7 +47,6 @@ RUN apt-get update \
        gcc \
        git \
        libpq-dev \
-       python3-dev \
     && rm -rf /var/lib/apt/lists/*
 # ↑ Always clean up apt cache to reduce layer size
 
@@ -64,8 +63,7 @@ COPY app/requirements.txt .
 # We compile them here with gcc available, then copy JUST the wheels
 # to Stage 2 where gcc doesn't exist. Think of it as:
 # "Cook the ingredients in a full kitchen, then plate them in a clean room."
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+RUN python -m pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
 
 # ═══════════════════════════════════════════
@@ -74,7 +72,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 # We start FROM SCRATCH with a fresh python:3.11-slim.
 # Nothing from Stage 1 exists here unless we explicitly COPY it.
 # No gcc, no build-essential, no source files from Stage 1.
-FROM python:3.11-slim AS runner
+FROM python:3.11-slim-bookworm AS runner
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -100,8 +98,7 @@ WORKDIR /code
 # Install the pre-compiled wheels from Stage 1
 # No compilation happens here — just extracting .whl files. Fast.
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir /wheels/* \
+RUN python -m pip install --no-cache-dir /wheels/* \
     && rm -rf /wheels
 
 # Copy application code
