@@ -434,6 +434,7 @@ export function OnboardingDialog() {
   const close = (withTour = false) => {
     localStorage.setItem(WELCOME_KEY, "1")
     setOpen(false)
+    window.dispatchEvent(new CustomEvent("vl:onboarding-done"))
     if (withTour) {
       setTimeout(() => startTour(), 400)
     }
@@ -442,6 +443,7 @@ export function OnboardingDialog() {
   const handleSignUp = () => {
     localStorage.setItem(WELCOME_KEY, "1")
     setOpen(false)
+    window.dispatchEvent(new CustomEvent("vl:onboarding-done"))
     setTimeout(() => setAuthOpen(true), 300)
   }
 

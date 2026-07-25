@@ -11,15 +11,26 @@ export function CookieBanner() {
     const [isVisible, setIsVisible] = useState(false)
 
     useEffect(() => {
-        // Check if the user has already consented
         const hasConsented = localStorage.getItem("pokispokey_cookie_consent")
+        if (hasConsented) return
 
-        // Wait a short delay before showing the banner so it doesn't jarringly appear instantly on load
-        if (!hasConsented) {
-            const timeout = setTimeout(() => {
-                setIsVisible(true)
-            }, 1000)
-            return () => clearTimeout(timeout)
+        let timeout: ReturnType<typeof setTimeout>
+
+        const show = () => {
+            timeout = setTimeout(() => setIsVisible(true), 1000)
+        }
+
+        // If onboarding is already done (returning user), show normally.
+        // Otherwise wait for onboarding to finish before appearing.
+        if (localStorage.getItem("vl_welcome_done")) {
+            show()
+        } else {
+            window.addEventListener("vl:onboarding-done", show, { once: true })
+        }
+
+        return () => {
+            clearTimeout(timeout)
+            window.removeEventListener("vl:onboarding-done", show)
         }
     }, [])
 
