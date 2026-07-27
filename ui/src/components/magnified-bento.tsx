@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Search01Icon,
@@ -54,15 +54,28 @@ const CONFIG = {
 };
 
 const MagnifiedBento = () => {
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
   const lensX = useMotionValue(0);
   const lensY = useMotionValue(0);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { threshold: 0.05 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const clipPath = useMotionTemplate`circle(30px at calc(50% + ${lensX}px - 10px) calc(50% + ${lensY}px - 10px))`;
   const inverseMask = useMotionTemplate`radial-gradient(circle 30px at calc(50% + ${lensX}px - 10px) calc(50% + ${lensY}px - 10px), transparent 100%, black 100%)`;
 
   return (
-    <div className="flex items-center justify-center w-full not-prose h-full bg-transparent">
+    <div ref={wrapperRef} className="flex items-center justify-center w-full not-prose h-full bg-transparent">
       <div className="group relative w-full h-full overflow-hidden rounded-none bg-transparent transition-all duration-500">
         <div
           ref={containerRef}
@@ -81,14 +94,14 @@ const MagnifiedBento = () => {
                 <motion.div
                   key={`row-${rowIndex}`}
                   className="flex gap-4 w-max"
-                  animate={{
+                  animate={isVisible ? {
                     x:
                       rowIndex % 2 === 0
                         ? ["0%", "-33.333%"]
                         : ["-33.333%", "0%"],
-                  }}
+                  } : undefined}
                   transition={{
-                    duration: 35, // Slower for longer text
+                    duration: 35,
                     ease: "linear",
                     repeat: Infinity,
                   }}
@@ -97,6 +110,7 @@ const MagnifiedBento = () => {
                     <div
                       key={`${item.id}-${idx}`}
                       className="flex gap-2 bg-background/50 backdrop-blur-sm whitespace-nowrap w-fit text-muted-foreground p-2 px-4 items-center border border-border/50 rounded-full text-xs shadow-xs"
+                      style={{ willChange: "transform", contain: "layout style paint" }}
                     >
                       <span>{item.label}</span>
                     </div>
@@ -116,14 +130,14 @@ const MagnifiedBento = () => {
                 <motion.div
                   key={`row-reveal-${rowIndex}`}
                   className="flex gap-4 w-max"
-                  animate={{
+                  animate={isVisible ? {
                     x:
                       rowIndex % 2 === 0
                         ? ["0%", "-33.333%"]
                         : ["-33.333%", "0%"],
-                  }}
+                  } : undefined}
                   transition={{
-                    duration: 35, // Slower for longer text
+                    duration: 35,
                     ease: "linear",
                     repeat: Infinity,
                   }}
