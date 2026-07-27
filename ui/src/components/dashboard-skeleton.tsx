@@ -17,7 +17,6 @@ import MagnifiedBento from "./magnified-bento";
 import { LogoCloud } from "@/components/logo-cloud";
 import { FaqBoxComponent } from "@/components/faq-box-component";
 import { ContactUs } from "@/components/contact-us";
-import { AsciiBackground } from "@/components/ui/ascii-background";
 import { startTour } from "@/components/app-tour";
 import { OnboardingDialog } from "@/components/onboarding-dialog";
 
@@ -264,16 +263,6 @@ export function DashboardSkeleton() {
 
 				{/* Center Content Box */}
 				<div className="col-span-2 lg:col-span-2 relative min-h-[350px] lg:min-h-[400px] flex flex-col items-center justify-center text-center px-4 py-12 bg-background">
-					{/* ASCII animation background — radial bloom, fades at edges */}
-					<div
-						className="absolute inset-0 z-0 pointer-events-none"
-						style={{
-							WebkitMaskImage: "radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 100%)",
-							maskImage: "radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 100%)"
-						}}
-					>
-						<AsciiBackground isDark={resolvedTheme === "dark"} />
-					</div>
 					<div className="relative z-10 flex flex-col items-center max-w-4xl mx-auto">
 
 						<h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight text-foreground mb-4 leading-[1.3] py-2">
