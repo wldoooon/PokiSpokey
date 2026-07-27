@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, X, ArrowRight, ChevronDown, Check, Clock, Lock, Tv, LayoutGrid, HelpCircle, Newspaper, Clapperboard, Mic, Drama, Sparkles } from 'lucide-react';
+import { Search, X, ArrowRight, ChevronDown, Check, Clock, Lock, Tv, LayoutGrid, HelpCircle, Newspaper, Clapperboard, Mic, Film, Sparkles } from 'lucide-react';
 import { getCategoriesForLanguage } from '@/lib/categories';
 import { startTour } from '@/components/app-tour';
 import { cn } from '@/lib/utils';
@@ -55,7 +55,7 @@ const CATEGORY_ICONS: Record<string, (cls: string) => React.ReactNode> = {
     News:     (cls) => <Newspaper className={cls} />,
     Cartoons: (cls) => <Clapperboard className={cls} />,
     Street:   (cls) => <Mic className={cls} />,
-    Drama:    (cls) => <Drama className={cls} />,
+    Drama:    (cls) => <Film className={cls} />,
     Anime:    (cls) => <Sparkles className={cls} />,
 };
 
