@@ -18,7 +18,6 @@ type SentenceGroupProps = {
   onExplainWordInContext?: (payload: { word: string; sentence: string }) => void
 }
 
-const HIGHLIGHT_FG = "oklch(0.708 0.195 38.402)"
 const HIGHLIGHT_BG = "oklch(0.708 0.195 38.402 / 0.35)"
 
 export const SentenceGroup = memo(({
@@ -43,7 +42,7 @@ export const SentenceGroup = memo(({
     if (!document.getElementById(styleId)) {
       const style = document.createElement("style")
       style.id = styleId
-      style.textContent = `::highlight(${highlightKey}) { background-color: ${HIGHLIGHT_BG}; color: ${HIGHLIGHT_FG}; }`
+      style.textContent = `::highlight(${highlightKey}) { background-color: ${HIGHLIGHT_BG}; }`
       document.head.appendChild(style)
     }
     return () => {
