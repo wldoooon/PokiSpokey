@@ -46,6 +46,10 @@ class SearchService:
             "map": {"Podcasts": 1, "Movies": 4},
             "default_id": 1,
         },
+        "japanese_dataset": {
+            "map": {"Anime": 1, "Drama": 2, "Street": 3, "Podcasts": 4},
+            "default_id": 1,
+        },
     }
 
     async def search(self, q: str, language: str, category: Optional[str] = None, sub_category: Optional[str] = None, page: int = 1, limit: int = 30) -> dict:

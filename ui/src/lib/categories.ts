@@ -30,11 +30,20 @@ export const FRENCH_CATEGORIES: CategoryItem[] = [
     { value: "Movies", label: "Movies" },
 ]
 
+export const JAPANESE_CATEGORIES: CategoryItem[] = [
+    { value: "All", label: "All" },
+    { value: "Podcasts", label: "Podcasts" },
+    { value: "Street", label: "Street Conversation" },
+    { value: "Drama", label: "Drama" },
+    { value: "Anime", label: "Anime" },
+]
+
 export const CATEGORIES_BY_LANGUAGE: Record<string, CategoryItem[]> = {
     english: ENGLISH_CATEGORIES,
     germany: GERMAN_CATEGORIES,
     spanish: SPANISH_CATEGORIES,
     french: FRENCH_CATEGORIES,
+    japanese: JAPANESE_CATEGORIES,
 }
 
 export function getCategoriesForLanguage(language: string): CategoryItem[] {

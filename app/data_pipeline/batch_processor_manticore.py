@@ -8,7 +8,7 @@ import manticoresearch
 from jsonl_reader import read_jsonl_lines
 
 MANTICORE_URL = os.getenv("MANTICORE_URL", "http://localhost:9308")
-TABLE_NAME = "english_dataset"
+TABLE_NAME = "japanese_dataset"
 
 def generate_sentence_id(video_id: str, position: int) -> int:
     """Generate a collision-free 64-bit integer ID from video_id and position.
@@ -62,7 +62,7 @@ async def create_table(reset: bool = False):
         start float,
         end_time float,
         position int
-    ) min_infix_len='2' html_strip='1'"""
+    ) charset_table='non_cjk' ngram_chars='japanese' ngram_len='1' html_strip='1'"""
     
     print(f"Creating table: {TABLE_NAME}...")
     result = await execute_sql(create_sql)
@@ -142,7 +142,7 @@ async def import_documents(index_api: manticoresearch.IndexApi, file_path: str, 
                         "sentence_text": sentence.get("sentence_text", ""),
                         "video_id": video_id,
                         "channel": channel,
-                        "category_title": "Talks",
+                        "category_id": {"Anime": 1, "Drama": 2, "Street": 3, "Podcasts": 4}.get(category, 1),
                         "category_type": movie_name,
                         "language": language,
                         "video_title": video_title,

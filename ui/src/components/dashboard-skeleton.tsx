@@ -132,7 +132,7 @@ export function DashboardSkeleton() {
 												<span>speak</span>
 												<div className="relative min-w-[180px] sm:min-w-[240px] h-[1.1em] flex items-center">
 													<GooeyText
-														texts={["English", "Spanish", "French", "German"]}
+														texts={["English", "Spanish", "French", "German", "Japanese"]}
 														morphTime={2}
 														cooldownTime={1}
 														className="w-full h-full"
@@ -189,7 +189,8 @@ export function DashboardSkeleton() {
 													{ name: "ENGLISH", icon: "/countries/English.png" },
 													{ name: "ESPAÑOL", icon: "/countries/spain.png" },
 													{ name: "DEUTSCH", icon: "/countries/germany.png" },
-													{ name: "FRANÇAIS", icon: "/countries/france.png" }
+													{ name: "FRANÇAIS", icon: "/countries/france.png" },
+													{ name: "日本語", icon: "/countries/japan.svg" }
 												].map((lang, idx) => (
 													<div key={`${copy}-${idx}`} className="w-[120px] sm:w-[192px] h-full border-r border-border/40 shrink-0 relative flex items-center justify-center">
 														{/* Floating Language Tags */}

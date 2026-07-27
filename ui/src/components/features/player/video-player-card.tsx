@@ -31,6 +31,7 @@ const PLAYER_VARS = {
   fs: 0,
   iv_load_policy: 3,
   cc_load_policy: 0,
+  cc_lang_pref: "off",
   origin: typeof window !== "undefined" ? window.location.origin : "",
 } as const
 

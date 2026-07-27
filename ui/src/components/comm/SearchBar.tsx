@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, X, ArrowRight, ChevronDown, Check, Clock, Lock, Tv, LayoutGrid, HelpCircle, Newspaper, Clapperboard } from 'lucide-react';
+import { Search, X, ArrowRight, ChevronDown, Check, Clock, Lock, Tv, LayoutGrid, HelpCircle, Newspaper, Clapperboard, Mic, Drama, Sparkles } from 'lucide-react';
 import { getCategoriesForLanguage } from '@/lib/categories';
 import { startTour } from '@/components/app-tour';
 import { cn } from '@/lib/utils';
@@ -54,6 +54,9 @@ const CATEGORY_ICONS: Record<string, (cls: string) => React.ReactNode> = {
     Podcasts: (cls) => <PodcastIcon className={cls} />,
     News:     (cls) => <Newspaper className={cls} />,
     Cartoons: (cls) => <Clapperboard className={cls} />,
+    Street:   (cls) => <Mic className={cls} />,
+    Drama:    (cls) => <Drama className={cls} />,
+    Anime:    (cls) => <Sparkles className={cls} />,
 };
 
 function withIcons(cats: { value: string; label: string }[]): RenderableCategory[] {
@@ -66,7 +69,7 @@ const LANGUAGES = [
     { value: 'Germany', label: 'Deutsch', flag: 'https://flagcdn.com/de.svg', available: true },
     { value: 'French', label: 'Français', flag: 'https://flagcdn.com/fr.svg', available: true },
     { value: 'Spanish', label: 'Español', flag: 'https://flagcdn.com/es.svg', available: true },
-    { value: 'Japanese', label: '日本語', flag: 'https://flagcdn.com/jp.svg', available: false },
+    { value: 'Japanese', label: '日本語', flag: 'https://flagcdn.com/jp.svg', available: true },
     { value: 'Chinese', label: '中文', flag: 'https://flagcdn.com/cn.svg', available: false },
 ];
 
