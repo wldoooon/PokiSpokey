@@ -13,6 +13,7 @@ output_transcripts.jsonl
 Thumbs.db
 
 .github/
+JP_dataset/
 scraping_test
 verbaLingo_agent
 dataset
