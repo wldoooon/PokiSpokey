@@ -25,15 +25,15 @@ const carouselItems = [
 		id: "1",
 		image: "/moviesPosters.png",
 		title: "Movies & Cinema",
-		description: "Search how any word is spoken in film scenes — played back via YouTube's official embed API.",
-		tags: ["Native Speech", "Real Context", "YouTube API"],
+		description: "Search how any word is spoken in film scenes with instant video playback.",
+		tags: ["Native Speech", "Real Context", "Film Scenes"],
 	},
 	{
 		id: "2",
 		image: "/PodcastCollection.png",
 		title: "Podcasts",
-		description: "Find conversational phrases spoken naturally by real podcasters across public YouTube videos.",
-		tags: ["Conversational", "All Levels", "Public Videos"],
+		description: "Find conversational phrases spoken naturally by real podcasters across authentic video clips.",
+		tags: ["Conversational", "All Levels", "Real Video"],
 	},
 	{
 		id: "3",
@@ -46,14 +46,14 @@ const carouselItems = [
 		id: "4",
 		image: "/Cartoon_Picture.jpg",
 		title: "Animated Shows",
-		description: "Discover clear, expressive pronunciation from animated YouTube content — searchable by word.",
-		tags: ["Clear Speech", "Beginner Friendly", "YouTube Embed"],
+		description: "Discover clear, expressive pronunciation from animated video content — searchable by word.",
+		tags: ["Clear Speech", "Beginner Friendly", "Animation"],
 	},
 	{
 		id: "5",
 		image: "/News.jpg",
 		title: "News & Journalism",
-		description: "Search formal vocabulary as spoken in public news broadcasts available on YouTube.",
+		description: "Search formal vocabulary as spoken in authentic news broadcasts.",
 		tags: ["Formal Speech", "Current Events", "All Levels"],
 		objectPosition: "top",
 	},
@@ -278,7 +278,7 @@ export function DashboardSkeleton() {
 						</h2>
 
 						<p className="text-sm sm:text-base md:text-lg text-foreground/80 font-medium max-w-2xl mx-auto leading-relaxed mt-2">
-							A language learning tool that searches public YouTube captions to find the exact moment any word is spoken, played back via YouTube's official embed API.
+							A language learning tool that searches authentic video captions to find the exact moment any word is spoken in real context.
 						</p>
 						{showTourHint && (
 							<button
