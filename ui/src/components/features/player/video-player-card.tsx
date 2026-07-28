@@ -312,7 +312,7 @@ export default function VideoPlayerCard({
     if (key === 'A') playerARef.current = player
     if (key === 'B') playerBRef.current = player
 
-    if (clip) lastSeekedClipId.current = clip.video_id
+    if (clip && isActive) lastSeekedKeyRef.current = `${currentVideoIndex}_${clip.video_id}_${getClipStart(clip)}`
 
     if (isActive) {
       setPlayer(player)
