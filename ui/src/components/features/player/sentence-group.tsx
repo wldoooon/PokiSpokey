@@ -95,6 +95,7 @@ type Sentence = {
 type SentenceGroupProps = {
   group: Sentence[]
   searchQuery: string
+  isActive?: boolean
   onSearchWord?: (word: string) => void
   onExplainWordInContext?: (payload: { word: string; sentence: string }) => void
 }
@@ -104,6 +105,7 @@ const HIGHLIGHT_BG = "oklch(0.708 0.195 38.402 / 0.35)"
 export const SentenceGroup = memo(({
   group,
   searchQuery,
+  isActive = false,
   onSearchWord,
   onExplainWordInContext,
 }: SentenceGroupProps) => {
@@ -240,6 +242,9 @@ export const SentenceGroup = memo(({
 
   return (
     <div className="flex items-center justify-center text-center px-4 py-1">
+      {isActive && (
+        <span className="shrink-0 w-1 sm:w-1.5 self-stretch bg-primary rounded-full mr-2.5 my-1 shadow-sm transition-all duration-200" />
+      )}
       <div ref={containerRef} className="relative text-sm sm:text-2xl font-medium leading-snug inline-block text-foreground tracking-tight">
         {group.map((sentence, sIdx) => {
           const rawWords: Word[] = (sentence.words as Word[] | undefined) || []

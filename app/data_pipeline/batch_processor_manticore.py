@@ -2,6 +2,8 @@ import os
 import json
 import asyncio
 import argparse
+import time
+from datetime import datetime
 import httpx
 import hashlib
 import manticoresearch
@@ -21,13 +23,12 @@ def generate_reading(text: str) -> str:
 MANTICORE_URL = os.getenv("MANTICORE_URL", "http://localhost:9308")
 TABLE_NAME = "japanese_dataset"
 
+def log_debug(msg: str):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] [DEBUG] {msg}", flush=True)
+
 def generate_sentence_id(video_id: str, position: int) -> int:
-    """Generate a collision-free 64-bit integer ID from video_id and position.
-    
-    Uses composite key: upper 48 bits = video_id hash, lower 16 bits = position.
-    Collisions require BOTH a video hash collision AND the same sentence position,
-    making the probability effectively 0% even at 30M+ documents.
-    """
+    """Generate a collision-free 64-bit integer ID from video_id and position."""
     if position > 65535:
         raise ValueError(f"Position {position} exceeds 16-bit limit (65535)")
     video_hash = int(hashlib.md5(video_id.encode()).hexdigest()[:12], 16)  # 48-bit hash
@@ -35,7 +36,6 @@ def generate_sentence_id(video_id: str, position: int) -> int:
 
 
 CATEGORY_TO_ID = {"Anime": 1, "Drama": 2, "Street": 3, "Podcasts": 4}
-# JSONL 'category' often holds the channel name instead of a category label
 CHANNEL_TO_ID = {"crunchyroll": 1, "OkkeiJapanese": 4}
 DEFAULT_CATEGORY_ID = 1  # Anime
 
@@ -56,26 +56,38 @@ async def get_api_client():
 
 
 async def execute_sql(sql: str) -> dict:
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{MANTICORE_URL}/sql?mode=raw",
-            data={"query": sql},
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
-        )
-        result = response.json()
-        if isinstance(result, list):
-            return result[0] if result else {}
-        return result
+    t0 = time.time()
+    log_debug(f"Sending SQL query to Manticore ({MANTICORE_URL}): {sql}")
+    async with httpx.AsyncClient(timeout=300.0) as client:
+        try:
+            response = await client.post(
+                f"{MANTICORE_URL}/sql?mode=raw",
+                data={"query": sql},
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
+            elapsed = time.time() - t0
+            log_debug(f"Received HTTP {response.status_code} response in {elapsed:.2f}s")
+            result = response.json()
+            if isinstance(result, list):
+                result = result[0] if result else {}
+            if result.get("error"):
+                log_debug(f"SQL Warning/Error response: {result.get('error')}")
+            return result
+        except Exception as e:
+            elapsed = time.time() - t0
+            log_debug(f"SQL execution failed after {elapsed:.2f}s: {e}")
+            raise
 
 
 async def create_table(reset: bool = False):
     if reset:
-        print(f"Dropping table: {TABLE_NAME}...")
+        log_debug(f"Starting table reset for: {TABLE_NAME}")
+        log_debug(f"Executing: DROP TABLE IF EXISTS {TABLE_NAME}...")
         result = await execute_sql(f"DROP TABLE IF EXISTS {TABLE_NAME}")
         if result.get("error"):
-            print(f"Drop warning: {result['error']}")
+            log_debug(f"Drop warning: {result['error']}")
         else:
-            print(f"Dropped table: {TABLE_NAME}")
+            log_debug(f"Table '{TABLE_NAME}' dropped successfully.")
     
     create_sql = f"""CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
         sentence_text text,
@@ -91,27 +103,28 @@ async def create_table(reset: bool = False):
         start float,
         end_time float,
         position int
-    ) charset_table='non_cjk' ngram_chars='japanese' ngram_len='2' html_strip='1'"""
+    ) charset_table='non_cjk' ngram_chars='cjk' ngram_len='1' html_strip='1'"""
     
-    print(f"Creating table: {TABLE_NAME}...")
+    log_debug(f"Executing: CREATE TABLE IF NOT EXISTS {TABLE_NAME} (ngram_len=1)...")
     result = await execute_sql(create_sql)
     
     if result.get("error"):
         error_msg = result["error"]
         if "already exists" in error_msg.lower():
-            print(f"Table {TABLE_NAME} already exists")
+            log_debug(f"Table {TABLE_NAME} already exists.")
         else:
-            print(f"Create table error: {error_msg}")
+            log_debug(f"Create table error: {error_msg}")
             raise Exception(error_msg)
     else:
-        print(f"Created table: {TABLE_NAME}")
+        log_debug(f"Table '{TABLE_NAME}' created successfully.")
     
+    log_debug("Verifying table in Manticore...")
     verify = await execute_sql("SHOW TABLES")
     tables = [row.get("Table") for row in verify.get("data", [])]
     if TABLE_NAME in tables:
-        print(f"Verified: {TABLE_NAME} exists in database")
+        log_debug(f"VERIFIED: '{TABLE_NAME}' exists and is ready in Manticore!")
     else:
-        print(f"Warning: {TABLE_NAME} not found in SHOW TABLES")
+        log_debug(f"WARNING: '{TABLE_NAME}' not found in SHOW TABLES output!")
 
 
 async def get_stats():

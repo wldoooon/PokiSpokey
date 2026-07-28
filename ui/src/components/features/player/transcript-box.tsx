@@ -229,6 +229,7 @@ export const TranscriptBox = ({
                 <SentenceGroup
                   group={[trio.active]}
                   searchQuery={searchQuery}
+                  isActive={true}
                   onSearchWord={onSearchWord}
                   onExplainWordInContext={onExplainWordInContext}
                 />

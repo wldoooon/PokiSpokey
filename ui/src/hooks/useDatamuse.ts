@@ -8,9 +8,17 @@ export interface Suggestion {
 }
 
 const WIKTIONARY_LANG: Record<string, string> = {
-  Germany: "de",
-  French:  "fr",
-  Spanish: "es",
+  Germany:  "de",
+  German:   "de",
+  de:       "de",
+  French:   "fr",
+  fr:       "fr",
+  Spanish:  "es",
+  es:       "es",
+  Japanese: "ja",
+  ja:       "ja",
+  Chinese:  "zh",
+  zh:       "zh",
 };
 
 async function fetchEnglish(query: string, signal: AbortSignal): Promise<Suggestion[]> {
