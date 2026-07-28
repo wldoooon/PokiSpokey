@@ -253,7 +253,7 @@ export const SentenceGroup = memo(({
           let words: Word[] = rawWords
           if (!hasWordLevelData && sentence.sentence_text) {
             const cleanText = sentence.sentence_text.replace(/<[^>]*>/g, '')
-            const duration = sentence.end_time - sentence.start_time
+            const duration = Math.max(0.1, sentence.end_time - sentence.start_time)
 
             let parts: string[]
             if (CJK_RE.test(cleanText)) {
@@ -268,12 +268,34 @@ export const SentenceGroup = memo(({
               parts = cleanText.split(/\s+/).filter(t => t.length > 0)
             }
 
-            const wordDuration = parts.length > 0 ? duration / parts.length : duration
-            words = parts.map((text, i) => ({
-              text,
-              start: sentence.start_time + i * wordDuration,
-              end: sentence.start_time + (i + 1) * wordDuration,
-            }))
+            // Weight each token's duration by character length and type.
+            // Punctuation tokens get a tiny weight so they don't linger or cause the highlight to rush ahead.
+            const PUNCT_RE = /^[^\w\u3040-\u30FF\u4E00-\u9FFF]+$/
+            const weights = parts.map(t => {
+              const str = t.trim()
+              if (!str || PUNCT_RE.test(str)) return 0.05
+              // Kanji characters represent multiple morae/syllables — give kanji a 1.5x weight multiplier
+              let w = 0
+              for (const ch of str) {
+                w += KANJI_RE.test(ch) ? 1.5 : 1.0
+              }
+              return Math.max(w, 0.5)
+            })
+
+            const totalWeight = weights.reduce((acc, val) => acc + val, 0) || 1
+            let currTime = sentence.start_time
+
+            words = parts.map((text, i) => {
+              const partDuration = duration * (weights[i] / totalWeight)
+              const wStart = currTime
+              const wEnd = currTime + partDuration
+              currTime = wEnd
+              return {
+                text,
+                start: wStart,
+                end: wEnd,
+              }
+            })
           }
 
           const sentenceText = words.map(w => (w.text || "").trim()).join("")
@@ -329,8 +351,8 @@ export const SentenceGroup = memo(({
                   <TranscriptWord
                     key={`${sentence.start_time}-${w.start}-${wi}`}
                     wordText={wordStr}
-                    start={w.start}
-                    end={w.end}
+                    start={hasWordLevelData ? w.start : -1}
+                    end={hasWordLevelData ? w.end : -1}
                     isSearchMatch={isMatch}
                     onSearchWord={onSearchWord}
                     onExplainWordInContext={(word) => {
