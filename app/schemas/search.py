@@ -15,6 +15,7 @@ class Word(BaseModel):
 
 class TranscriptSentence(BaseModel):
     sentence_text: str
+    sentence_reading: Optional[str] = None
     start_time: float
     end_time: float
     words: List[Word] = []

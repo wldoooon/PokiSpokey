@@ -46,6 +46,7 @@ type Sentence = {
   start_time: number
   end_time: number
   sentence_text?: string
+  sentence_reading?: string
   words?: Word[]
 }
 
@@ -101,39 +102,38 @@ export const TranscriptBox = ({
   const activeIdx = usePlayerStore(state => {
     if (sentences.length === 0) return -1
 
-    // If the player hasn't updated the time yet (currentTime is exactly 0), 
-    // and we have a target index, default to it so we show the keyword sentence initially.
-    if (state.currentTime === 0 && targetIdx !== -1) {
-      return targetIdx
-    }
-
     const TIMING_LEAD = 0.05 * state.playbackRate
     const t = state.currentTime + TIMING_LEAD
 
-    // Exact match: currentTime is within a sentence
+    // 1. Exact match: currentTime is within a sentence
     const exact = sentences.findIndex(s => t >= s.start_time && t < s.end_time)
     if (exact !== -1) return exact
 
-    // Gap/silence: return the last sentence whose start we've passed.
+    // 2. If we haven't reached the target keyword sentence yet (e.g. video is seeking, 
+    // buffering, or currentTime is 0 / before targetSentence.start_time), 
+    // show the target keyword sentence immediately so there is zero initial flicker.
+    if (targetIdx !== -1) {
+      const target = sentences[targetIdx]
+      if (target && t < target.start_time) {
+        return targetIdx
+      }
+    }
+
+    // 3. Gap/silence after starting playback: return the last sentence whose start we've passed.
     // Since sentences are sorted, scan forward and stop when we overshoot.
     let last = -1
     for (let i = 0; i < sentences.length; i++) {
       if (t >= sentences[i].start_time) last = i
       else break
     }
-    return last
+    return last !== -1 ? last : (targetIdx !== -1 ? targetIdx : 0)
   })
 
   // Find the trio: Previous, Active, and Next.
-  // Pure computation — no ref mutations, safe for Concurrent Mode.
-  // When activeIdx is -1 but sentences exist, fall back to showing the first sentence.
-  // This prevents the "Waiting for playback..." ghost state that occurs because
-  // currentTime in the store is still 0 while the YouTube player hasn't fired
-  // its first onStateChange yet.
   const trio = useMemo(() => {
     if (sentences.length === 0) return null
 
-    const idx = activeIdx === -1 ? 0 : activeIdx
+    const idx = activeIdx === -1 ? (targetIdx !== -1 ? targetIdx : 0) : activeIdx
     const active = sentences[idx]
     if (!active) return null
 
@@ -143,7 +143,7 @@ export const TranscriptBox = ({
       next: sentences[idx + 1],
       activeIdx: idx,
     }
-  }, [activeIdx, sentences])
+  }, [activeIdx, targetIdx, sentences])
 
   // Broadcast the live-updating context snippet up to the AI
   useEffect(() => {
@@ -228,6 +228,7 @@ export const TranscriptBox = ({
                 <SentenceGroup
                   group={[trio.active]}
                   searchQuery={searchQuery}
+                  isActive={true}
                   onSearchWord={onSearchWord}
                   onExplainWordInContext={onExplainWordInContext}
                 />
