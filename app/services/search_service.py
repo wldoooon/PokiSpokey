@@ -127,8 +127,15 @@ class SearchService:
         }
 
     async def _fetch_category(self, q: str, category: str, table_name: str, limit: int, sub_category: Optional[str], category_id: Optional[int]) -> dict:
+        is_japanese = table_name == "japanese_dataset"
+        if is_japanese:
+            query_field = "@(sentence_text,sentence_reading)"
+            match_q = f'"{q}"'
+        else:
+            query_field = "@sentence_text"
+            match_q = q
         must_conditions = [
-            {"query_string": f"@sentence_text {q}"},
+            {"query_string": f"{query_field} {match_q}"},
             {"equals": {"category_id": category_id}} if category_id is not None else {"equals": {"category_title": category}},
         ]
         if sub_category:

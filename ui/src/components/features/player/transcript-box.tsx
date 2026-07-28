@@ -46,6 +46,7 @@ type Sentence = {
   start_time: number
   end_time: number
   sentence_text?: string
+  sentence_reading?: string
   words?: Word[]
 }
 

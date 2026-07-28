@@ -43,5 +43,8 @@ loguru>=0.7.0
 # ─── Background Jobs ───
 apscheduler>=3.10.1
 
+# ─── Japanese NLP (data pipeline only) ───
+pykakasi>=2.2.1
+
 # ─── UUID v7 generation ───
 uuid6>=2024.1.12

@@ -1,13 +1,19 @@
 "use client"
 
 import { memo, useRef, useEffect, useId } from "react"
+import { tokenize } from "wakachigaki"
 import { TranscriptWord } from "./transcript-word"
+
+// Matches hiragana, katakana, and kanji — used to detect Japanese text only
+const CJK_RE = /[\u3040-\u30FF\u4E00-\u9FFF]/
+
 
 type Word = { text: string; start: number; end: number }
 type Sentence = {
   start_time: number
   end_time: number
   sentence_text?: string
+  sentence_reading?: string
   words?: Word[]
 }
 
@@ -52,12 +58,9 @@ export const SentenceGroup = memo(({
   }, [highlightKey])
 
   // CSS Custom Highlight API — works for all languages including CJK.
-  //
-  // Key fix: build a per-character position map (charMap) that skips ALL
-  // whitespace characters. This means fullText never has spaces regardless
-  // of how TranscriptWord renders (inline space, trailing space, etc.).
-  // Intl.Segmenter splits the query into natural Japanese word segments so
-  // multi-morpheme queries like '食べる時間' are each found independently.
+  // Builds a per-character position map skipping all whitespace so the query
+  // matches across TranscriptWord token boundaries (e.g. 'ありがとうございます'
+  // spans multiple wakachigaki tokens but is found as one contiguous range).
   useEffect(() => {
     if (!CSS.highlights) return
     CSS.highlights.delete(highlightKey)
@@ -104,6 +107,45 @@ export const SentenceGroup = memo(({
       pos = fullText.indexOf(term, pos + 1)
     }
 
+    // Reading-based fallback: hiragana query vs kanji transcript.
+    // If exact match failed, check each sentence's sentence_reading field.
+    // On match, highlight the entire sentence span in the DOM.
+    if (ranges.length === 0 && CJK_RE.test(term)) {
+      let charPos = 0
+      for (const sentence of group) {
+        const reading = (sentence.sentence_reading || "").replace(/\s/g, "")
+        const rawWords: Word[] = (sentence.words as Word[] | undefined) || []
+        const hasWordLevel = rawWords.length > 1 &&
+          rawWords.every(w => w.text && !w.text.trim().includes(" ")) &&
+          rawWords.some(w => w.start > 0 || w.end > 0)
+
+        let parts: string[]
+        if (!hasWordLevel && sentence.sentence_text) {
+          const clean = sentence.sentence_text.replace(/<[^>]*>/g, "")
+          if (CJK_RE.test(clean)) {
+            try { parts = (tokenize(clean) as string[]).filter((t: string) => t.trim().length > 0) }
+            catch { parts = clean.split(/\s+/).filter(t => t.length > 0) }
+          } else {
+            parts = clean.split(/\s+/).filter(t => t.length > 0)
+          }
+        } else {
+          parts = rawWords.map(w => (w.text || "").trim()).filter(t => t.length > 0)
+        }
+
+        const sentenceLen = parts.join("").replace(/\s/g, "").length
+        const endPos = charPos + sentenceLen - 1
+
+        if (reading && reading.includes(term) && sentenceLen > 0 && endPos < charMap.length) {
+          const range = new Range()
+          range.setStart(charMap[charPos].node, charMap[charPos].offset)
+          range.setEnd(charMap[endPos].node, charMap[endPos].offset + 1)
+          ranges.push(range)
+        }
+
+        charPos += sentenceLen
+      }
+    }
+
     if (ranges.length > 0) {
       CSS.highlights.set(highlightKey, new Highlight(...ranges))
     }
@@ -126,18 +168,16 @@ export const SentenceGroup = memo(({
             const cleanText = sentence.sentence_text.replace(/<[^>]*>/g, '')
             const duration = sentence.end_time - sentence.start_time
 
-            // Use Intl.Segmenter to split CJK/Japanese sentences into real words.
-            // Falls back to whitespace split for Latin text or unsupported envs.
-            let parts: string[] = []
-            try {
-              if ("Segmenter" in Intl) {
-                const seg = new (Intl as any).Segmenter("ja", { granularity: "word" })
-                parts = [...seg.segment(cleanText)]
-                  .map((s: any) => s.segment as string)
-                  .filter(s => s.trim().length > 0)
+            let parts: string[]
+            if (CJK_RE.test(cleanText)) {
+              // Japanese — use wakachigaki (MeCab/NEologd-trained, 92% accuracy)
+              try {
+                parts = (tokenize(cleanText) as string[]).filter((t: string) => t.trim().length > 0)
+              } catch {
+                parts = cleanText.split(/\s+/).filter(t => t.length > 0)
               }
-            } catch {}
-            if (!parts.length) {
+            } else {
+              // All other languages — simple whitespace split
               parts = cleanText.split(/\s+/).filter(t => t.length > 0)
             }
 

@@ -5,7 +5,18 @@ import argparse
 import httpx
 import hashlib
 import manticoresearch
+import pykakasi
 from jsonl_reader import read_jsonl_lines
+
+# Initialise once at module level — pykakasi loads its dictionary on first use
+_kks = pykakasi.kakasi()
+
+def generate_reading(text: str) -> str:
+    """Convert Japanese text (kanji/katakana/hiragana mix) to hiragana reading."""
+    try:
+        return "".join(item["hira"] for item in _kks.convert(text))
+    except Exception:
+        return text
 
 MANTICORE_URL = os.getenv("MANTICORE_URL", "http://localhost:9308")
 TABLE_NAME = "japanese_dataset"
@@ -21,6 +32,22 @@ def generate_sentence_id(video_id: str, position: int) -> int:
         raise ValueError(f"Position {position} exceeds 16-bit limit (65535)")
     video_hash = int(hashlib.md5(video_id.encode()).hexdigest()[:12], 16)  # 48-bit hash
     return (video_hash << 16) | position
+
+
+CATEGORY_TO_ID = {"Anime": 1, "Drama": 2, "Street": 3, "Podcasts": 4}
+# JSONL 'category' often holds the channel name instead of a category label
+CHANNEL_TO_ID = {"crunchyroll": 1, "OkkeiJapanese": 4}
+DEFAULT_CATEGORY_ID = 1  # Anime
+
+
+def resolve_category_id(category: str, channel: str) -> int:
+    if category in CATEGORY_TO_ID:
+        return CATEGORY_TO_ID[category]
+    if category in CHANNEL_TO_ID:
+        return CHANNEL_TO_ID[category]
+    if channel in CHANNEL_TO_ID:
+        return CHANNEL_TO_ID[channel]
+    return DEFAULT_CATEGORY_ID
 
 
 async def get_api_client():
@@ -52,9 +79,11 @@ async def create_table(reset: bool = False):
     
     create_sql = f"""CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
         sentence_text text,
+        sentence_reading text,
         video_id string,
         channel string,
         category_title string,
+        category_id int,
         category_type string,
         language string,
         video_title string,
@@ -62,7 +91,7 @@ async def create_table(reset: bool = False):
         start float,
         end_time float,
         position int
-    ) charset_table='non_cjk' ngram_chars='japanese' ngram_len='1' html_strip='1'"""
+    ) charset_table='non_cjk' ngram_chars='japanese' ngram_len='2' html_strip='1'"""
     
     print(f"Creating table: {TABLE_NAME}...")
     result = await execute_sql(create_sql)
@@ -140,9 +169,10 @@ async def import_documents(index_api: manticoresearch.IndexApi, file_path: str, 
                     "id": doc_id,
                     "doc": {
                         "sentence_text": sentence.get("sentence_text", ""),
+                        "sentence_reading": generate_reading(sentence.get("sentence_text", "")),
                         "video_id": video_id,
                         "channel": channel,
-                        "category_id": {"Anime": 1, "Drama": 2, "Street": 3, "Podcasts": 4}.get(category, 1),
+                        "category_id": resolve_category_id(category, channel),
                         "category_type": movie_name,
                         "language": language,
                         "video_title": video_title,
