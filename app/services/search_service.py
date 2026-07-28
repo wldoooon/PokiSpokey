@@ -127,6 +127,16 @@ class SearchService:
         }
 
     async def _fetch_category(self, q: str, category: str, table_name: str, limit: int, sub_category: Optional[str], category_id: Optional[int]) -> dict:
+        is_cjk_query = any(
+            '\u3040' <= c <= '\u30ff' or  # Hiragana & Katakana
+            '\u4e00' <= c <= '\u9faf' or  # CJK Kanji
+            '\uac00' <= c <= '\ud7af'     # Hangul
+            for c in q
+        )
+        is_cjk_table = table_name in ["japanese_dataset", "chinese_dataset"]
+        if is_cjk_query and not is_cjk_table:
+            return {"hits": [], "total": 0}
+
         is_japanese = table_name == "japanese_dataset"
         if is_japanese:
             query_field = "@(sentence_text,sentence_reading)"
@@ -134,9 +144,14 @@ class SearchService:
         else:
             query_field = "@sentence_text"
             match_q = q
+        if category_id is None:
+            config = self._LANGUAGE_CONFIG.get(table_name, {})
+            cat_map = config.get("map", {})
+            category_id = cat_map.get(category, config.get("default_id", 1))
+
         must_conditions = [
             {"query_string": f"{query_field} {match_q}"},
-            {"equals": {"category_id": category_id}} if category_id is not None else {"equals": {"category_title": category}},
+            {"equals": {"category_id": category_id}},
         ]
         if sub_category:
             must_conditions.append({"equals": {"category_type": sub_category}})

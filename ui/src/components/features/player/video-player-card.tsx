@@ -248,16 +248,8 @@ export default function VideoPlayerCard({
     if (!hasEverPlayedRef.current) {
       if (event.data === -1) {
         startStallTimer()
-      } else if (event.data === 3) {
+      } else if (event.data === 1 || event.data === 3) {
         clearStallTimer()
-        // Seek to the clip's keyword timestamp when the player starts buffering.
-        // seekTo() calls issued immediately after loadVideoById() are ignored because
-        // the player is mid-load. State=3 (buffering) is the earliest reliable moment
-        // to seek — the player has loaded enough data to accept the command.
-        const clip = key === 'A' ? clipA : clipB
-        if (clip) {
-          safeCall(event.target, 'seekTo', getClipStart(clip), true)
-        }
       }
     } else {
       // After first play: always clear stall timer
@@ -338,6 +330,9 @@ export default function VideoPlayerCard({
         if (!mountedRef.current) return
         if (key === getLiveActiveKey()) return
         const liveRef = key === 'A' ? playerARef.current : playerBRef.current
+        if (!liveRef) return
+
+        safeCall(liveRef, 'mute')
         safeCall(liveRef, 'playVideo')
         setTimeout(() => {
           if (!mountedRef.current) return
@@ -345,10 +340,11 @@ export default function VideoPlayerCard({
             const ref = key === 'A' ? playerARef.current : playerBRef.current
             safeCall(ref, 'pauseVideo')
           }
-        }, 1200)
+        }, 1000)
       }
 
-      setTimeout(() => triggerBuffer(), 3000)
+      // Prebuffer after 300ms (instead of 3000ms delay) so next video is warm instantly
+      setTimeout(() => triggerBuffer(), 300)
     }
   }
 
