@@ -97,27 +97,27 @@ export function ThumbProgressCarousel({
       </Carousel>
 
       {/* Labeled progress bar navigation */}
-      <div className='absolute bottom-0 left-0 right-0 flex flex-col sm:flex-row gap-1 sm:gap-2 px-3 sm:px-5 pb-3 sm:pb-4'>
+      <div className='absolute bottom-0 left-0 right-0 flex flex-col sm:flex-row gap-1 sm:gap-2 px-3 sm:px-5 pb-3 sm:pb-4 z-20'>
         {items.map((item, idx) => (
           <button
             key={item.id}
             onClick={() => api?.scrollTo(idx)}
-            className='flex flex-row items-center gap-2 sm:flex-1 sm:flex-col sm:items-start sm:gap-1 group/nav text-left w-full'
+            className='flex flex-row sm:flex-col items-center justify-center gap-2 sm:flex-1 sm:items-center sm:gap-1.5 group/nav text-center w-full cursor-pointer'
           >
             <span
               className={cn(
-                'text-[9px] sm:text-[10px] font-bold uppercase tracking-widest whitespace-nowrap sm:truncate transition-colors duration-200 shrink-0',
+                'text-[9px] sm:text-[10px] font-bold uppercase tracking-widest whitespace-nowrap sm:truncate transition-colors duration-200 shrink-0 text-center w-full',
                 idx === current
-                  ? 'text-white'
+                  ? 'text-white font-extrabold'
                   : 'text-white/40 group-hover/nav:text-white/70'
               )}
             >
               {item.title}
             </span>
-            <div className='h-0.5 flex-1 sm:flex-none sm:w-full bg-white/20 rounded-full overflow-hidden'>
+            <div className='h-1 flex-1 sm:flex-none sm:w-full bg-white/20 rounded-full overflow-hidden'>
               {idx === current ? (
                 <div
-                  className='h-full bg-orange-400 rounded-full'
+                  className='h-full bg-orange-500 rounded-full'
                   style={{
                     width: filling && !isPaused ? '100%' : '0%',
                     transition: filling && !isPaused
@@ -129,7 +129,7 @@ export function ThumbProgressCarousel({
               ) : (
                 <div
                   className={cn(
-                    'h-full rounded-full',
+                    'h-full rounded-full transition-all duration-300',
                     idx < current ? 'w-full bg-white/50' : 'w-0'
                   )}
                 />
