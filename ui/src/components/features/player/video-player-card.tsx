@@ -66,7 +66,7 @@ export default function VideoPlayerCard({
 
   const { category, language, subCategory, setSubCategory, lastAggregations, setLastAggregations } = useSearchStore()
 
-  const lastSeekedClipId = useRef<string | null>(null)
+  const lastSeekedKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (aggregations && !subCategory && Object.keys(aggregations).length > 0) {
@@ -102,8 +102,6 @@ export default function VideoPlayerCard({
 
   const startStallTimer = () => {
     clearStallTimer()
-    // 6s: initial YouTube load takes 3-6s to reach first buffering event.
-    // The old 3s timer was firing before the player had a chance to start loading.
     stallTimerRef.current = setTimeout(() => {
       if (!mountedRef.current) return
       consecutiveAutoSkipsRef.current += 1
@@ -153,13 +151,15 @@ export default function VideoPlayerCard({
       if (!clip) return
 
       if (isActuallyActive) {
-        const willSeek = lastSeekedClipId.current !== clip.video_id
-        console.log(`[PREV-DEBUG] syncEffect slot=${key} clip=${clip.video_id} willSeek=${willSeek} lastSeeked=${lastSeekedClipId.current} playerRef=${player}`)
+        const seekKey = `${currentVideoIndex}_${clip.video_id}_${getClipStart(clip)}`
+        const willSeek = lastSeekedKeyRef.current !== seekKey
+        console.log(`[PREV-DEBUG] syncEffect slot=${key} clip=${clip.video_id} idx=${currentVideoIndex} willSeek=${willSeek} seekKey=${seekKey}`)
         if (willSeek) {
           const exactStart = getClipStart(clip);
           console.log(`[PREV-DEBUG] syncEffect SEEKING slot=${key} exactStart=${exactStart} playerRef=${player}`)
           safeCall(player, 'seekTo', exactStart, true)
-          lastSeekedClipId.current = clip.video_id
+          setCurrentTime(exactStart)
+          lastSeekedKeyRef.current = seekKey
         }
         safeCall(player, 'playVideo')
         safeCall(player, 'setPlaybackRate', playbackRate)
@@ -178,7 +178,7 @@ export default function VideoPlayerCard({
     syncSinglePlayer('A', playerARef.current)
     syncSinglePlayer('B', playerBRef.current)
 
-  }, [activeKey, activeClipId, isMuted, playbackRate, setPlayer, clipA, clipB, activePlayer])
+  }, [currentVideoIndex, activeKey, activeClipId, isMuted, playbackRate, setPlayer, clipA, clipB, activePlayer, setCurrentTime])
 
   const startPolling = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)

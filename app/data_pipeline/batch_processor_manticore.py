@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import json
 import asyncio
@@ -10,7 +11,7 @@ import manticoresearch
 import pykakasi
 from jsonl_reader import read_jsonl_lines
 
-# Initialise once at module level — pykakasi loads its dictionary on first use
+# Initialise once at module level - pykakasi loads its dictionary on first use
 _kks = pykakasi.kakasi()
 
 def generate_reading(text: str) -> str:

@@ -47,7 +47,7 @@ class SearchService:
             "default_id": 1,
         },
         "japanese_dataset": {
-            "map": {"Anime": 1, "Drama": 2, "Street": 3, "Podcasts": 4},
+            "map": {"Podcasts": 1, "Drama": 2, "Street": 3, "Anime": 4},
             "default_id": 1,
         },
     }
