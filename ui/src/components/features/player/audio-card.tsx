@@ -519,6 +519,35 @@ export default function AudioCard({
     }
   }, [targetSentence, player, seekTo, play])
 
+  // ── UI Safety Net: Verify keyword presence in transcript ────────────────────
+  const isKeywordVerifiedInTranscript = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim()
+    if (!query) return true // No search query active (e.g. browsing category)
+    if (isTranscriptLoading || !transcriptData) return true // Don't skip while transcript is loading
+
+    if (!sentencesInClip || sentencesInClip.length === 0) return false
+
+    return sentencesInClip.some((sentence: any) => {
+      const text = (sentence.sentence_text || "").toLowerCase()
+      const reading = (sentence.sentence_reading || "").toLowerCase()
+      return text.includes(query) || reading.includes(query)
+    })
+  }, [searchQuery, isTranscriptLoading, transcriptData, sentencesInClip])
+
+  // Skip clip if transcript resolved and search query is not found anywhere in transcript
+  useEffect(() => {
+    if (!searchQuery || !searchQuery.trim()) return
+    if (isTranscriptLoading || isParentLoading) return
+    if (!transcriptData) return
+
+    if (!isKeywordVerifiedInTranscript && currentClip) {
+      console.warn(`[UI-SAFETY-NET] Skipping clip ${currentClip.video_id} (idx=${currentVideoIndex}) — keyword "${searchQuery}" not found in transcript.`)
+      if (currentVideoIndex < playlist.length - 1) {
+        nextVideo()
+      }
+    }
+  }, [searchQuery, isTranscriptLoading, isParentLoading, transcriptData, isKeywordVerifiedInTranscript, currentClip, currentVideoIndex, playlist.length, nextVideo])
+
   return (
     <div className="relative border border-border/70 p-2.5">
       <DecorIcon position="top-left" />

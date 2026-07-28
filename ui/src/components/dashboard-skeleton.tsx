@@ -37,13 +37,20 @@ const carouselItems = [
 	},
 	{
 		id: "3",
+		image: "/anime2.jpg",
+		title: "Anime",
+		description: "Master authentic expressions, dialogue, and natural speech from popular anime clips.",
+		tags: ["Anime", "Authentic Speech", "Real Context"],
+	},
+	{
+		id: "4",
 		image: "/Cartoon_Picture.jpg",
 		title: "Animated Shows",
 		description: "Discover clear, expressive pronunciation from animated YouTube content — searchable by word.",
 		tags: ["Clear Speech", "Beginner Friendly", "YouTube Embed"],
 	},
 	{
-		id: "4",
+		id: "5",
 		image: "/News.jpg",
 		title: "News & Journalism",
 		description: "Search formal vocabulary as spoken in public news broadcasts available on YouTube.",
