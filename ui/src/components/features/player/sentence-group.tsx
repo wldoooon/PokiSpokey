@@ -6,6 +6,81 @@ import { TranscriptWord } from "./transcript-word"
 
 // Matches hiragana, katakana, and kanji — used to detect Japanese text only
 const CJK_RE = /[\u3040-\u30FF\u4E00-\u9FFF]/
+const KANJI_RE = /[\u4E00-\u9FFF\u3400-\u4DBF]/
+const KATAKANA_RE = /[\u30A0-\u30FF]/
+
+// Align sentence_reading (hiragana) back to sentence_text character positions.
+// Returns two parallel arrays over reading positions:
+//   alignStart[ri] = first text char index for this reading position
+//   alignEnd[ri]   = exclusive-end text char index for this reading position
+// Non-kanji chars map 1:1. Kanji sequences consume multiple reading chars and
+// all map to the same text span (start=kanjiBlockStart, end=kanjiBlockEnd).
+function alignReadingToText(text: string, reading: string) {
+  const alignStart = new Array<number>(reading.length).fill(0)
+  const alignEnd   = new Array<number>(reading.length).fill(0)
+
+  if (!text || !reading) return { alignStart, alignEnd }
+
+  let ti = 0, ri = 0
+
+  while (ti < text.length && ri < reading.length) {
+    if (!KANJI_RE.test(text[ti])) {
+      alignStart[ri] = ti
+      alignEnd[ri]   = ti + 1
+
+      const tChar = text[ti]
+      const tHira = KATAKANA_RE.test(tChar)
+        ? String.fromCharCode(tChar.charCodeAt(0) - 0x60)
+        : tChar
+
+      const rHira = KATAKANA_RE.test(reading[ri])
+        ? String.fromCharCode(reading[ri].charCodeAt(0) - 0x60)
+        : reading[ri]
+
+      if (tHira === rHira) {
+        ti++
+        ri++
+      } else {
+        ri++
+      }
+    } else {
+      const kanjiStart = ti
+      while (ti < text.length && KANJI_RE.test(text[ti])) ti++
+      const kanjiEnd = ti
+
+      let anchorHira = ""
+      if (ti < text.length) {
+        const nextChar = text[ti]
+        anchorHira = KATAKANA_RE.test(nextChar)
+          ? String.fromCharCode(nextChar.charCodeAt(0) - 0x60)
+          : nextChar
+      }
+
+      const rStart = ri
+      let rEnd = ri
+      if (anchorHira) {
+        while (rEnd < reading.length) {
+          const rChar = reading[rEnd]
+          const rHira = KATAKANA_RE.test(rChar)
+            ? String.fromCharCode(rChar.charCodeAt(0) - 0x60)
+            : rChar
+          if (rHira === anchorHira) break
+          rEnd++
+        }
+      } else {
+        rEnd = reading.length
+      }
+
+      for (let r = rStart; r < rEnd; r++) {
+        alignStart[r] = kanjiStart
+        alignEnd[r]   = kanjiEnd
+      }
+      ri = rEnd
+    }
+  }
+
+  return { alignStart, alignEnd }
+}
 
 
 type Word = { text: string; start: number; end: number }
@@ -135,11 +210,23 @@ export const SentenceGroup = memo(({
         const sentenceLen = parts.join("").replace(/\s/g, "").length
         const endPos = charPos + sentenceLen - 1
 
-        if (reading && reading.includes(term) && sentenceLen > 0 && endPos < charMap.length) {
-          const range = new Range()
-          range.setStart(charMap[charPos].node, charMap[charPos].offset)
-          range.setEnd(charMap[endPos].node, charMap[endPos].offset + 1)
-          ranges.push(range)
+        const readingMatchPos = reading ? reading.indexOf(term) : -1
+        if (readingMatchPos !== -1 && sentenceLen > 0) {
+          const strippedText = parts.join("").replace(/\s/g, "")
+          const { alignStart, alignEnd } = alignReadingToText(strippedText, reading)
+          const textStart = alignStart[readingMatchPos]
+          const textEnd   = alignEnd[readingMatchPos + term.length - 1]
+
+          if (textStart >= 0 && textEnd > textStart) {
+            const cmStart = charPos + textStart
+            const cmEnd   = charPos + textEnd - 1  // inclusive
+            if (cmStart < charMap.length && cmEnd < charMap.length) {
+              const range = new Range()
+              range.setStart(charMap[cmStart].node, charMap[cmStart].offset)
+              range.setEnd(charMap[cmEnd].node, charMap[cmEnd].offset + 1)
+              ranges.push(range)
+            }
+          }
         }
 
         charPos += sentenceLen
@@ -189,24 +276,68 @@ export const SentenceGroup = memo(({
             }))
           }
 
+          const sentenceText = words.map(w => (w.text || "").trim()).join("")
+          const sentenceNorm = sentenceText.toLowerCase().replace(/\s/g, "")
+
+          const matchCharSpans: { start: number; end: number }[] = []
+          if (queryNorm) {
+            let p = sentenceNorm.indexOf(queryNorm)
+            while (p !== -1) {
+              matchCharSpans.push({ start: p, end: p + queryNorm.length })
+              p = sentenceNorm.indexOf(queryNorm, p + 1)
+            }
+
+            if (matchCharSpans.length === 0 && CJK_RE.test(queryNorm) && sentence.sentence_reading) {
+              const reading = sentence.sentence_reading.replace(/\s/g, "")
+              const readingMatchPos = reading.indexOf(queryNorm)
+              if (readingMatchPos !== -1) {
+                const { alignStart, alignEnd } = alignReadingToText(sentenceText, reading)
+                const textStart = alignStart[readingMatchPos]
+                const textEnd = alignEnd[readingMatchPos + queryNorm.length - 1]
+                if (textStart >= 0 && textEnd > textStart) {
+                  matchCharSpans.push({ start: textStart, end: textEnd })
+                }
+              }
+            }
+          }
+
+          let charOffset = 0
+
           return (
             <span key={`${sentence.start_time}-${sIdx}`}>
               {words.map((w, wi) => {
-                const wordNorm = (w.text || "").toLowerCase().replace(/\s/g, "")
-                const isMatch = !!queryNorm && wordNorm.includes(queryNorm)
+                const wordStr = (w.text || "").trim()
+                const wordLen = wordStr.length
+                const wordCharStart = charOffset
+                const wordCharEnd = charOffset + wordLen
+                charOffset += wordLen
+
+                const wordNorm = wordStr.toLowerCase().replace(/\s/g, "")
+                let isMatch = false
+
+                if (queryNorm) {
+                  if (matchCharSpans.length > 0) {
+                    isMatch = matchCharSpans.some(
+                      span => Math.max(wordCharStart, span.start) < Math.min(wordCharEnd, span.end)
+                    )
+                  } else {
+                    isMatch = wordNorm.includes(queryNorm)
+                  }
+                }
+
                 return (
                   <TranscriptWord
                     key={`${sentence.start_time}-${w.start}-${wi}`}
-                    wordText={(w.text || "").trim()}
+                    wordText={wordStr}
                     start={w.start}
                     end={w.end}
                     isSearchMatch={isMatch}
                     onSearchWord={onSearchWord}
                     onExplainWordInContext={(word) => {
-                      const sentenceText =
+                      const sentenceTextFull =
                         sentence.sentence_text ||
                         words.map((ww: Word) => ww.text).join(" ")
-                      onExplainWordInContext?.({ word, sentence: sentenceText })
+                      onExplainWordInContext?.({ word, sentence: sentenceTextFull })
                     }}
                   />
                 )

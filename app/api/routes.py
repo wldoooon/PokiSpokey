@@ -202,6 +202,7 @@ async def get_transcript(
         
         sentence = TranscriptSentence(
             sentence_text=source.get("sentence_text", ""),
+            sentence_reading=source.get("sentence_reading"),
             start_time=source.get("start", 0.0),
             end_time=source.get("end_time", 0.0),
             words=words,

@@ -48,6 +48,7 @@ export interface TranscriptLine {
 
 export interface TranscriptSentence {
   sentence_text: string;
+  sentence_reading?: string;
   start_time: number;
   end_time: number;
   words?: { text: string; start: number; end: number }[];
