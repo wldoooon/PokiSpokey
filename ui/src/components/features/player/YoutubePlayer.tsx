@@ -47,6 +47,7 @@ export function YoutubePlayer({
   const readyRef     = useRef(false)
   const pendingRef   = useRef<{ videoId: string; startSeconds: number } | null>(null)
   const activeVideoIdRef = useRef(videoId)
+  const activeStartSecondsRef = useRef(startSeconds)
 
   // ── Always-current callback refs ─────────────────────────────────────────
   // Critical: new YT.Player() captures closures at mount. By routing all events
@@ -61,8 +62,8 @@ export function YoutubePlayer({
   // ── Create player once on mount ──────────────────────────────────────────
   useEffect(() => {
     cancelledRef.current = false
-    const mountVideo = videoId
     activeVideoIdRef.current = videoId
+    activeStartSecondsRef.current = startSeconds
 
     const init = () => {
       if (cancelledRef.current || !containerRef.current) return
@@ -119,10 +120,13 @@ export function YoutubePlayer({
 
   // ── Handle video changes without destroying the player ───────────────────
   useEffect(() => {
-    if (!videoId || videoId === activeVideoIdRef.current) return
-    activeVideoIdRef.current = videoId
+    if (!videoId) return
+    if (videoId === activeVideoIdRef.current && startSeconds === activeStartSecondsRef.current) return
 
-    const payload = { videoId, startSeconds }
+    activeVideoIdRef.current = videoId
+    activeStartSecondsRef.current = startSeconds
+
+    const payload = { videoId, startSeconds: Math.floor(startSeconds) }
 
     if (!readyRef.current || !playerRef.current) {
       pendingRef.current = payload
@@ -132,7 +136,7 @@ export function YoutubePlayer({
     console.log(`[PREV-DEBUG] YoutubePlayer loadVideoById payload=`, payload, `playerRef=`, playerRef.current)
     try { playerRef.current.loadVideoById(payload) } catch { }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoId])
+  }, [videoId, startSeconds])
 
   return (
     <div className={className}>

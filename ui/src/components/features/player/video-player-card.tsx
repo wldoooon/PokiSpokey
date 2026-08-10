@@ -106,6 +106,7 @@ export default function VideoPlayerCard({
       if (!mountedRef.current) return
       consecutiveAutoSkipsRef.current += 1
       if (consecutiveAutoSkipsRef.current <= 5) {
+        lastSeekedKeyRef.current = null
         usePlayerStore.getState().nextVideo()
       }
     }, 6000)
@@ -130,6 +131,7 @@ export default function VideoPlayerCard({
     if (activeClip && erroredClipsRef.current.has(activeClip.video_id)) {
       consecutiveAutoSkipsRef.current += 1;
       if (consecutiveAutoSkipsRef.current <= 10) {
+        lastSeekedKeyRef.current = null;
         usePlayerStore.getState().nextVideo();
       }
       return;
@@ -242,6 +244,22 @@ export default function VideoPlayerCard({
           event.target.setPlaybackQuality('hd720')
         }
       } catch { }
+
+      // ── Enforce Keyword Start Duration Safety Net ───────────────────
+      // If YouTube started playing from 0.0s (or skipped startSeconds due to load race),
+      // force seek to the exact clip start time immediately.
+      const activeClip = key === 'A' ? clipA : clipB
+      if (activeClip) {
+        const exactStart = getClipStart(activeClip)
+        try {
+          const currentPos = event.target.getCurrentTime()
+          if (typeof currentPos === 'number' && (currentPos < exactStart - 1.5 || currentPos > exactStart + 30)) {
+            console.log(`[SEEK-SAFETY-NET] Enforcing start duration=${exactStart} (currentPos=${currentPos})`)
+            safeCall(event.target, 'seekTo', exactStart, true)
+            setCurrentTime(exactStart)
+          }
+        } catch { }
+      }
     }
 
     // Stall detection — only before first play (avoids triggering on user-pause)
@@ -270,6 +288,7 @@ export default function VideoPlayerCard({
         clearStallTimer()
         consecutiveAutoSkipsRef.current += 1
         if (consecutiveAutoSkipsRef.current <= 10) {
+          lastSeekedKeyRef.current = null
           usePlayerStore.getState().nextVideo()
         }
       }
