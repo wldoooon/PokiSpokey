@@ -59,21 +59,48 @@ export async function generateMetadata({
   const baseUrl = "https://pokispokey.com";
   const canonicalUrl = `${baseUrl}/search/${encodeURIComponent(query)}/${language.toLowerCase()}`;
 
-  const title = `"${query}" in ${formattedLanguage}: Meaning, Pronunciation & Video Examples`;
-  const description = `Hear how native speakers pronounce "${query}" in real ${formattedLanguage} movies, podcasts, and video clips with interactive dual subtitles on PokiSpokey.`;
+  // Smart title highlighting the diverse content mix (Movies, Anime/Cartoons, Talks & Street Dialogue)
+  const isJapanese = language.toLowerCase() === "japanese" || language.toLowerCase() === "ja";
+  const mediaHook = isJapanese ? "Anime, Movies & Talks" : "Movies, Talks & Conversations";
+  const title = `"${query}" in Context: Real ${formattedLanguage} ${mediaHook}`;
+  
+  const description = `See how native speakers use "${query}" in real ${formattedLanguage} movies, anime, street conversations & talks. Watch authentic dialogue scenes with dual subtitles on PokiSpokey.`;
 
   return {
     title,
     description,
     alternates: { canonical: canonicalUrl },
     keywords: [
-      `pronounce ${query}`,
-      `${query} pronunciation`,
-      `${query} in ${formattedLanguage}`,
-      `${query} meaning in context`,
-      `${query} video examples`,
-      `how to use ${query}`,
-      `learn ${formattedLanguage} with videos`,
+      // 1. Context & Sentence Usage (Competing with Linguee & Reverso)
+      `"${query}" in context`,
+      `how to use "${query}" in ${formattedLanguage}`,
+      `"${query}" in real sentences`,
+      `"${query}" meaning in context`,
+      `"${query}" real life dialogue`,
+
+      // 2. Real Media: Movies, Anime, Cartoons & TV
+      `"${query}" movie clips`,
+      `"${query}" anime clips`,
+      `"${query}" cartoon scenes`,
+      `"${query}" in TV shows`,
+      `hear "${query}" in real movies`,
+
+      // 3. Natural Speech: Talks, Podcasts & Street Conversations
+      `"${query}" street conversations`,
+      `"${query}" in podcasts and talks`,
+      `how native speakers say "${query}"`,
+      `"${query}" everyday speech`,
+
+      // 4. Spoken Pronunciation & Accents (Competing with YouGlish & Forvo)
+      `how to pronounce "${query}"`,
+      `"${query}" pronunciation in ${formattedLanguage}`,
+      `"${query}" native speaker accent`,
+      `pronounce "${query}" with video clips`,
+
+      // 5. Interactive Dual Subtitles & Language Learning
+      `"${query}" with dual subtitles`,
+      `learn ${formattedLanguage} with video clips`,
+      `learn ${formattedLanguage} from movies and anime`,
       "PokiSpokey",
     ],
     openGraph: {
@@ -87,7 +114,7 @@ export async function generateMetadata({
           url: "/main_logo.png",
           width: 512,
           height: 512,
-          alt: `PokiSpokey - ${query} in ${formattedLanguage}`,
+          alt: `PokiSpokey - "${query}" in real ${formattedLanguage} clips and dialogue`,
         },
       ],
     },
@@ -133,13 +160,13 @@ export default async function SearchSegmentLayout({ children, params }: Props) {
         "@type": "DefinedTerm",
         name: query,
         inDefinedTermSet: `${baseUrl}/search?language=${language.toLowerCase()}`,
-        description: `Authentic spoken pronunciation, video context, and subtitles for "${query}" in ${formattedLanguage}.`,
+        description: `Authentic spoken pronunciation, video context, movie & anime dialogue, and dual subtitles for "${query}" in ${formattedLanguage}.`,
         url: pageUrl,
       },
       {
         "@type": "VideoObject",
-        name: `How to pronounce "${query}" in real ${formattedLanguage} conversations`,
-        description: `Watch and listen to native speakers pronounce "${query}" in authentic video clips on PokiSpokey.`,
+        name: `How native speakers use and pronounce "${query}" in real ${formattedLanguage} clips`,
+        description: `Watch authentic movies, anime, talks, and street conversations where native speakers use "${query}" with interactive dual subtitles on PokiSpokey.`,
         thumbnailUrl: [`${baseUrl}/main_logo.png`],
         uploadDate: "2026-01-01T00:00:00Z",
         embedUrl: pageUrl,
@@ -165,18 +192,18 @@ export default async function SearchSegmentLayout({ children, params }: Props) {
        * Rendered on the SERVER. Invisible to real users (sr-only = not displayed
        * on screen). Fully readable by Googlebot in raw HTML — no JS required.
        *
-       * Each word produces a completely different set of real movie/show quotes,
+       * Each word produces a completely different set of real dialogue quotes,
        * making every one of the 20,580 pages genuinely unique in Google's eyes.
        * The interactive player below (page.tsx) is completely unaffected.
        */}
       {previewClips.length > 0 && (
         <section
-          aria-label={`Native speaker examples for "${query}" in ${formattedLanguage}`}
+          aria-label={`Real native speaker examples for "${query}" in ${formattedLanguage} movies, anime, talks, and conversations`}
           className="sr-only"
         >
           <h2>
             How native speakers use &ldquo;{query}&rdquo; in real{" "}
-            {formattedLanguage} movies and videos:
+            {formattedLanguage} movies, anime, talks, and street conversations:
           </h2>
           <ol>
             {previewClips.map((clip, i) => (
