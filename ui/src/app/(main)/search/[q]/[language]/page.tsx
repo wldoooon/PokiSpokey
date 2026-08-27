@@ -31,7 +31,6 @@ const AiCompletion = dynamic(() => import("@/components/ai-completion").then(mod
 import { SearchLimitWall } from "@/components/features/search-limit-wall"
 import { NoResults } from "@/components/features/search/no-results"
 import { PlayerErrorBoundary } from "@/components/PlayerErrorBoundary"
-import { AppTour } from "@/components/app-tour"
 
 export default function RoutedSearchPage() {
   const [mounted, setMounted] = useState(false)
@@ -181,7 +180,6 @@ export default function RoutedSearchPage() {
 
   return (
     <>
-      <AppTour ready={playlist.length > 0} />
       <div className="flex-1 flex flex-col min-h-0 bg-transparent text-card-foreground">
         {showWall ? (
           /* ── Signup Wall ── */
