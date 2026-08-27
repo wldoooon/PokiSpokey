@@ -24,7 +24,9 @@ async function triggerTourIfNew(queryClient: QueryClient): Promise<void> {
   } catch {
     // non-critical — tour fires regardless
   }
-  setTimeout(() => startTour(), 800);
+  if (typeof window !== "undefined" && window.location.pathname === "/") {
+    setTimeout(() => startTour(), 800);
+  }
 }
 
 export function useMeQuery() {

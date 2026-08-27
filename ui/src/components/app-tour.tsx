@@ -40,6 +40,7 @@ export function AppTour({ ready }: { ready: boolean }) {
   useEffect(() => {
     if (!ready) return
     if (typeof window === "undefined") return
+    if (window.location.pathname !== "/") return
     if (localStorage.getItem(TOUR_KEY)) return
 
     // Small delay so all elements are painted
@@ -65,6 +66,7 @@ export function AppTour({ ready }: { ready: boolean }) {
 }
 
 export function startTour() {
+  if (typeof window === "undefined") return
   localStorage.removeItem(TOUR_KEY)
   const driverObj = driver({
     showProgress: true,
